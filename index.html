@@ -31,7 +31,7 @@
             </button>
             <button class="tab-btn" id="tabPasteBtn">
               <svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: text-bottom; margin-right: 4px;"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect></svg>
-              コピペ入力
+              テキスト直接入力
             </button>
           </div>
 
@@ -53,7 +53,7 @@
 
           <!-- Demo Data Action -->
           <div class="demo-box">
-            <button id="loadDemoBtn" class="btn btn-ghost btn-block">✨ サンプルデータで試す (月次売上)</button>
+            <button id="loadDemoBtn" class="btn btn-ghost btn-block">✨ サンプルデータで試す (英国交通事故死傷者数)</button>
           </div>
         </section>
 
@@ -144,7 +144,7 @@
               <label for="viewModeSelect">📊 表示切替:</label>
               <select id="viewModeSelect" class="form-control-select">
                 <option value="overlay" selected>元データ と トレンド</option>
-                <option value="adjusted">元データ と 季節調整値</option>
+                <option value="adjusted">元データ と 周期調整済データ</option>
                 <option value="decomposition">4成分分解 (Subplots)</option>
                 <option value="observed">元データのみ</option>
                 <option value="trend">トレンドのみ</option>
@@ -173,7 +173,7 @@
             <div class="empty-state">
               <div class="empty-icon">📊</div>
               <h3>データを読み込んでください</h3>
-              <p>左側のパネルから Excel/CSV ファイルをアップロードするか、セルをコピー＆ペーストしてください。</p>
+              <p>左側のパネルから Excel/CSV ファイルをアップロードするか、データを直接貼り付けてください。</p>
             </div>
           </div>
         </div>
@@ -197,27 +197,26 @@
 
         <!-- Summary Statistics Table -->
         <div id="statsCard" class="stats-card hidden">
-          <h3>分解結果サマリー</h3>
-          <div class="stats-grid">
-            <div class="stat-item">
-              <span class="stat-label">データ点数</span>
-              <span id="statCount" class="stat-val">-</span>
+          <div style="margin-bottom: 20px;">
+            <h3 style="margin-bottom: 12px; font-size: 1.1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 6px;">📊 元データの基本統計量</h3>
+            <div class="stats-grid">
+              <div class="stat-item"><span class="stat-label">データ点数</span><span id="statCount" class="stat-val">-</span></div>
+              <div class="stat-item"><span class="stat-label">平均値</span><span id="statMean" class="stat-val">-</span></div>
+              <div class="stat-item"><span class="stat-label">中央値</span><span id="statMedian" class="stat-val">-</span></div>
+              <div class="stat-item"><span class="stat-label">最大値</span><span id="statMax" class="stat-val">-</span></div>
+              <div class="stat-item"><span class="stat-label">最小値</span><span id="statMin" class="stat-val">-</span></div>
             </div>
-            <div class="stat-item">
-              <span class="stat-label">全データ平均</span>
-              <span id="statMean" class="stat-val">-</span>
+          </div>
+          
+          <div>
+            <h3 style="margin-bottom: 12px; font-size: 1.1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 6px;">📈 STL分析結果の概要</h3>
+            <div class="stats-grid" style="margin-bottom: 12px;">
+              <div class="stat-item"><span class="stat-label">トレンド変動幅</span><span id="statTrendRange" class="stat-val">-</span></div>
+              <div class="stat-item"><span class="stat-label">周期変動幅</span><span id="statSeasonalRange" class="stat-val">-</span></div>
+              <div class="stat-item"><span class="stat-label">残差ばらつき(SD)</span><span id="statResidualSD" class="stat-val">-</span></div>
             </div>
-            <div class="stat-item">
-              <span class="stat-label">トレンド幅 (Max-Min)</span>
-              <span id="statTrendRange" class="stat-val">-</span>
-            </div>
-            <div class="stat-item">
-              <span class="stat-label">周期変動幅 (Max-Min)</span>
-              <span id="statSeasonalRange" class="stat-val">-</span>
-            </div>
-            <div class="stat-item">
-              <span class="stat-label">残差の標準偏差 (SD)</span>
-              <span id="statResidualSD" class="stat-val">-</span>
+            <div id="analysisComment" style="padding: 12px; background: rgba(0,0,0,0.2); border-left: 4px solid var(--accent-blue); font-size: 0.95rem; line-height: 1.5;">
+              <!-- JSで自動生成 -->
             </div>
           </div>
         </div>

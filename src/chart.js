@@ -66,7 +66,7 @@ export function renderChart(containerId, timestamps, stlResult, viewMode, varNam
     plot_bgcolor: plotBg,
     font: { color: palette.text, family: 'Inter, "Noto Sans JP", sans-serif' },
     hoverlabel: commonHoverLabel,
-    margin: { t: 50, r: 30, l: 65, b: 55 },
+    margin: { t: 50, r: 30, l: 65, b: 80 },
     hovermode: 'x unified',
     autosize: true,
     showlegend: true,
@@ -96,7 +96,7 @@ export function renderChart(containerId, timestamps, stlResult, viewMode, varNam
   let titleText = customTitle.trim();
   if (!titleText) {
     if (viewMode === 'overlay') titleText = `元データ と トレンド曲線 (${varName})`;
-    else if (viewMode === 'adjusted') titleText = `元データ と 季節調整値 (${varName})`;
+    else if (viewMode === 'adjusted') titleText = `元データ と 周期調整済データ (${varName})`;
     else if (viewMode === 'decomposition') titleText = `STL分解一覧 - ${varName}`;
     else if (viewMode === 'observed') titleText = `元データ (${varName})`;
     else if (viewMode === 'trend') titleText = `トレンド成分 (${varName})`;
@@ -154,7 +154,7 @@ export function renderChart(containerId, timestamps, stlResult, viewMode, varNam
       title: { text: titleText, font: { size: 17, color: palette.text, weight: 700 } },
       grid: { rows: 4, columns: 1, sharex: true },
       showlegend: false,
-      margin: { t: 60, r: 30, l: 65, b: 45 },
+      margin: { t: 60, r: 30, l: 65, b: 70 },
       xaxis: { ...commonXAxis, anchor: 'y', showticklabels: false },
       yaxis: { ...commonYAxis, title: { text: 'Observed', font: { color: palette.subtext } } },
       xaxis2: { ...commonXAxis, anchor: 'y2', showticklabels: false },
@@ -206,7 +206,7 @@ export function renderChart(containerId, timestamps, stlResult, viewMode, varNam
         y: adjusted,
         type: 'scatter',
         mode: 'lines',
-        name: '季節調整値 (Adjusted)',
+        name: '周期調整済データ (Adjusted)',
         line: { color: palette.residual, width: 2.5 }
       }
     ];

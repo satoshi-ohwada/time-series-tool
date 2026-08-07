@@ -47,8 +47,9 @@ export function parsePastedText(text) {
  * @param {ArrayBuffer} buffer 
  * @returns {Array<Object>} Parsed row objects
  */
-export function parseFileBuffer(buffer) {
-  const workbook = XLSX.read(buffer, { type: 'array', cellDates: true });
+export function parseFileBuffer(data, isText = false) {
+  const readType = isText ? 'string' : 'array';
+  const workbook = XLSX.read(data, { type: readType, cellDates: true });
   const firstSheetName = workbook.SheetNames[0];
   const worksheet = workbook.Sheets[firstSheetName];
 
