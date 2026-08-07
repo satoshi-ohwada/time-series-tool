@@ -14,7 +14,7 @@ const state = {
   valueCols: [],
   selectedVar: '',
   period: 12,
-  model: 'additive', // 'additive' | 'multiplicative'
+  model: 'auto', // 'auto' | 'additive' | 'multiplicative'
   seasonalMode: 'periodic', // 'periodic' | 'flexible'
   viewMode: 'overlay',
   mainMode: 'graph', // 'graph' | 'result' | 'table'
@@ -369,9 +369,9 @@ function runDecompositionForAllVars() {
     const { values: interpV } = interpolateMissingSeries(rawT, rawV, state.enableInterpolation);
 
     if (interpV.length > 0) {
-      const result = stlDecompose(interpV, {
+      const result = getBestStlDecompose(interpV, {
         period: state.period,
-        multiplicative: state.model === 'multiplicative',
+        modelMode: state.model,
         seasonalWindow: state.seasonalMode === 'periodic' ? 'periodic' : 7
       });
       state.decompositions[varName] = result;
@@ -381,6 +381,51 @@ function runDecompositionForAllVars() {
   updateChartDisplay();
   updateResultTableDisplay();
   updateSummaryStats();
+}
+
+function getBestStlDecompose(values, options) {
+  if (options.modelMode !== 'auto') {
+    return stlDecompose(values, {
+      period: options.period,
+      multiplicative: options.modelMode === 'multiplicative',
+      seasonalWindow: options.seasonalWindow
+    });
+  }
+
+  // Try Additive
+  const resAdd = stlDecompose(values, {
+    period: options.period,
+    multiplicative: false,
+    seasonalWindow: options.seasonalWindow
+  });
+  
+  // Try Multiplicative
+  const resMul = stlDecompose(values, {
+    period: options.period,
+    multiplicative: true,
+    seasonalWindow: options.seasonalWindow
+  });
+
+  // Calculate Mean Absolute Error (MAE) for both models to pick the best fit
+  let maeAdd = 0, maeMul = 0;
+  const n = values.length;
+  for (let i = 0; i < n; i++) {
+    const fittedAdd = resAdd.trend[i] + resAdd.seasonal[i];
+    maeAdd += Math.abs(values[i] - fittedAdd);
+
+    const fittedMul = resMul.trend[i] * resMul.seasonal[i];
+    maeMul += Math.abs(values[i] - fittedMul);
+  }
+  maeAdd /= n;
+  maeMul /= n;
+
+  if (maeMul < maeAdd) {
+    resMul._autoDetected = 'multiplicative';
+    return resMul;
+  } else {
+    resAdd._autoDetected = 'additive';
+    return resAdd;
+  }
 }
 
 function runDecompositionForSelectedVar() {
@@ -397,9 +442,9 @@ function runDecompositionForSelectedVar() {
     interpolationNotice.classList.add('hidden');
   }
 
-  const result = stlDecompose(values, {
+  const result = getBestStlDecompose(values, {
     period: state.period,
-    multiplicative: state.model === 'multiplicative',
+    modelMode: state.model,
     seasonalWindow: state.seasonalMode === 'periodic' ? 'periodic' : 7
   });
 
@@ -472,6 +517,11 @@ function updateSummaryStats() {
 
   let comment = `<strong>【分析のヒント】</strong><br><br>`;
   
+  if (state.model === 'auto' && res._autoDetected) {
+    const modelName = res._autoDetected === 'multiplicative' ? '乗法モデル' : '加法モデル';
+    comment += `<strong>▪ 自動判定モデル: ${modelName}</strong><br>加法モデルと乗法モデルの両方を計算し、より残差が小さく綺麗に分解できた <strong>${modelName}</strong> を自動選択しました。<br><br>`;
+  }
+
   // トレンドの解説
   const trendDiff = res.trend[count - 1] - res.trend[0];
   const trendDir = trendDiff > 0 ? '上昇' : '下降';

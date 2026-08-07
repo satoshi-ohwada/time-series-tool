@@ -110,10 +110,13 @@
           </div>
 
           <div class="form-group">
-            <label for="modelSelect">分解モデル</label>
+            <label for="modelSelect">分解モデル:
+              <span class="tooltip-icon" title="自動: 残差が小さくなる方を自動選択&#10;加法: 波の振れ幅が一定&#10;乗法: 値が大きくなると波も大きくなる">ℹ️</span>
+            </label>
             <select id="modelSelect" class="form-control">
-              <option value="additive">加法モデル (Y = Trend + Seasonal + Residual)</option>
-              <option value="multiplicative">乗法モデル (Y = Trend × Seasonal × Residual)</option>
+              <option value="auto">自動判定 (Auto)</option>
+              <option value="additive">加法モデル (Additive)</option>
+              <option value="multiplicative">乗法モデル (Multiplicative)</option>
             </select>
           </div>
 
