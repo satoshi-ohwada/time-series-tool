@@ -127,6 +127,29 @@
               <option value="flexible">経年での変化を許容する (STL標準)</option>
             </select>
           </div>
+
+          <!-- Advanced Analytics Settings (Change Point & CUSUM) -->
+          <div class="form-group border-top-divider">
+            <label class="section-sublabel">🔍 変化点・CUSUM設定 (オプション)</label>
+            <div class="grid-2col">
+              <div>
+                <label for="cpSensitivitySelect" class="sub-label">変化点感度</label>
+                <select id="cpSensitivitySelect" class="form-control">
+                  <option value="low">低 (上位3点)</option>
+                  <option value="medium" selected>標準 (上位5点)</option>
+                  <option value="high">高 (上位8点)</option>
+                </select>
+              </div>
+              <div>
+                <label for="cusumSensitivitySelect" class="sub-label">CUSUM閾値</label>
+                <select id="cusumSensitivitySelect" class="form-control">
+                  <option value="high">高感度 (3σ)</option>
+                  <option value="medium" selected>標準 (4σ)</option>
+                  <option value="low">低感度 (5σ)</option>
+                </select>
+              </div>
+            </div>
+          </div>
         </section>
       </aside>
 
@@ -153,7 +176,20 @@
                 <option value="trend">トレンドのみ</option>
                 <option value="seasonal">周期変動のみ</option>
                 <option value="residual">残差のみ</option>
+                <option value="cusum">残差 CUSUM 管理図 (累積和法)</option>
               </select>
+            </div>
+
+            <!-- Annotation Toggles (Show / Hide on Graph) -->
+            <div class="annotation-toggles">
+              <label class="toggle-badge" id="changePointToggleLabel" title="トレンドの主な変曲点・ピーク・ボトムを図に表示/非表示">
+                <input type="checkbox" id="showChangePointsCheck" checked>
+                <span>📍 変化点を表示</span>
+              </label>
+              <label class="toggle-badge" id="cusumAlertToggleLabel" title="残差の持続的な偏り（CUSUM異常シフト区間）を図に表示/非表示">
+                <input type="checkbox" id="showCusumAlertsCheck">
+                <span>⚠️ CUSUM異常を表示</span>
+              </label>
             </div>
 
             <div class="chart-options">
@@ -230,6 +266,6 @@
   <script src="./lib/plotly.min.js"></script>
   <script src="./lib/xlsx.full.min.js"></script>
 
-  <script type="module" src="./src/main.js?v=11"></script>
+  <script type="module" src="./src/main.js?v=15"></script>
 </body>
 </html>

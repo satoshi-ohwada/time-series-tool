@@ -730,3 +730,121 @@ body {
     min-height: 400px;
   }
 }
+
+/* ==========================================
+ * Advanced Analytics (Change Point & CUSUM)
+ * ========================================== */
+.border-top-divider {
+  border-top: 1px solid var(--border-color);
+  padding-top: 0.85rem;
+  margin-top: 0.85rem;
+}
+
+.section-sublabel {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--accent-blue);
+  margin-bottom: 0.6rem;
+  display: block;
+}
+
+.grid-2col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+
+.sub-label {
+  font-size: 0.72rem;
+  color: var(--text-sub);
+  margin-bottom: 0.25rem;
+  display: block;
+}
+
+/* Annotation Toggles on Chart Bar */
+.annotation-toggles {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.toggle-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.3rem 0.65rem;
+  background: var(--bg-dark);
+  border: 1px solid var(--border-color);
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--text-sub);
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.2s ease;
+}
+
+.toggle-badge:hover {
+  border-color: var(--accent-blue);
+  color: var(--text-main);
+}
+
+.toggle-badge input[type="checkbox"] {
+  cursor: pointer;
+  accent-color: var(--accent-blue);
+  width: 14px;
+  height: 14px;
+}
+
+.toggle-badge:has(input[type="checkbox"]:checked) {
+  background: rgba(56, 189, 248, 0.12);
+  border-color: var(--accent-blue);
+  color: var(--text-main);
+  box-shadow: 0 0 8px rgba(56, 189, 248, 0.2);
+}
+
+#cusumAlertToggleLabel:has(input[type="checkbox"]:checked) {
+  background: rgba(244, 63, 94, 0.12);
+  border-color: var(--accent-pink);
+  box-shadow: 0 0 8px rgba(244, 63, 94, 0.2);
+}
+
+/* Diagnostic Badges in Result Table */
+.badge-diag {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.15rem 0.5rem;
+  border-radius: 12px;
+  white-space: nowrap;
+  letter-spacing: 0.02em;
+}
+
+.badge-cp {
+  background: rgba(245, 158, 11, 0.2);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.4);
+}
+
+.badge-cusum {
+  background: rgba(239, 68, 68, 0.2);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.4);
+}
+
+.row-has-cp {
+  background-color: rgba(245, 158, 11, 0.04);
+}
+
+.row-has-cusum {
+  background-color: rgba(239, 68, 68, 0.05);
+}
+
+.analysis-badge-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.5rem;
+}
+

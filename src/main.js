@@ -1,8 +1,10 @@
 /**
  * Main application integration logic
  */
-import { parsePastedText, parseFileBuffer, detectColumns, extractTimeSeries, detectPeriodicity, interpolateMissingSeries } from './parser.js';
+import { parsePastedText, parseFileBuffer, decodeCsvBuffer, detectColumns, extractTimeSeries, detectPeriodicity, interpolateMissingSeries } from './parser.js';
 import { stlDecompose } from './stl.js';
+import { detectTrendChangePoints } from './changePoint.js';
+import { calculateResidualCusum } from './cusum.js';
 import { renderChart, downloadChartImage } from './chart.js';
 import { exportSingleVariableCSV, exportAllVariablesCSV } from './exporter.js';
 import { renderTableEditor } from './tableEditor.js';
@@ -21,7 +23,12 @@ const state = {
   customTitle: '',
   bgMode: 'dark', // 'dark' | 'white' | 'transparent'
   enableInterpolation: true,
+  showChangePoints: true,
+  showCusumAlerts: false,
+  cpSensitivity: 'medium', // 'low' | 'medium' | 'high'
+  cusumSensitivity: 'medium', // 'low' | 'medium' | 'high'
   decompositions: {}, // Map of varName -> { observed, trend, seasonal, residual }
+  analytics: {}, // Map of varName -> { changePoints, cusumResult }
   timestamps: []
 };
 
@@ -55,6 +62,10 @@ const autoInterpolateCheck = document.getElementById('autoInterpolateCheck');
 const interpolationNotice = document.getElementById('interpolationNotice');
 const modelSelect = document.getElementById('modelSelect');
 const seasonalModeSelect = document.getElementById('seasonalModeSelect');
+const cpSensitivitySelect = document.getElementById('cpSensitivitySelect');
+const cusumSensitivitySelect = document.getElementById('cusumSensitivitySelect');
+const showChangePointsCheck = document.getElementById('showChangePointsCheck');
+const showCusumAlertsCheck = document.getElementById('showCusumAlertsCheck');
 const bgColorSelect = document.getElementById('bgColorSelect');
 const downloadImageBtn = document.getElementById('downloadImageBtn');
 
@@ -65,6 +76,10 @@ function initEventListeners() {
   // Input Method Tabs
   tabFileBtn.addEventListener('click', () => switchInputTab('file'));
   tabPasteBtn.addEventListener('click', () => switchInputTab('paste'));
+
+  // Prevent accidental drop outside dropzone causing browser navigation
+  window.addEventListener('dragover', (e) => e.preventDefault());
+  window.addEventListener('drop', (e) => e.preventDefault());
 
   // File Upload & Drag & Drop
   dropZone.addEventListener('dragover', (e) => {
@@ -170,6 +185,41 @@ function initEventListeners() {
       updateChartDisplay();
     });
   }
+
+  // Analytics Toggles & Settings
+  if (showChangePointsCheck) {
+    showChangePointsCheck.addEventListener('change', (e) => {
+      state.showChangePoints = e.target.checked;
+      updateChartDisplay();
+    });
+  }
+
+  if (showCusumAlertsCheck) {
+    showCusumAlertsCheck.addEventListener('change', (e) => {
+      state.showCusumAlerts = e.target.checked;
+      updateChartDisplay();
+    });
+  }
+
+  if (cpSensitivitySelect) {
+    cpSensitivitySelect.addEventListener('change', (e) => {
+      state.cpSensitivity = e.target.value;
+      runAnalyticsForAllVars();
+      updateChartDisplay();
+      updateResultTableDisplay();
+      updateSummaryStats();
+    });
+  }
+
+  if (cusumSensitivitySelect) {
+    cusumSensitivitySelect.addEventListener('change', (e) => {
+      state.cusumSensitivity = e.target.value;
+      runAnalyticsForAllVars();
+      updateChartDisplay();
+      updateResultTableDisplay();
+      updateSummaryStats();
+    });
+  }
 }
 
 function switchInputTab(type) {
@@ -189,16 +239,27 @@ function switchInputTab(type) {
 async function handleFile(file) {
   try {
     let rows;
-    if (file.name.toLowerCase().endsWith('.csv')) {
-      const text = await file.text(); // ブラウザ標準のデコード（UTF-8対応）
+    const isCsv = file.name.toLowerCase().endsWith('.csv');
+    const arrayBuffer = await file.arrayBuffer();
+
+    if (isCsv) {
+      // Decode with automatic UTF-8 / Shift_JIS detection
+      const text = decodeCsvBuffer(arrayBuffer);
       rows = parseFileBuffer(text, true);
+      // Fallback to text parser if SheetJS returned empty
+      if (!rows || rows.length === 0) {
+        rows = parsePastedText(text);
+      }
     } else {
-      const arrayBuffer = await file.arrayBuffer();
       rows = parseFileBuffer(arrayBuffer, false);
     }
     processParsedRows(rows);
   } catch (err) {
+    console.error('File parsing error:', err);
     alert(`ファイルの読み込みに失敗しました: ${err.message}`);
+  } finally {
+    // Reset file input so that selecting the same file again triggers change event
+    if (fileInput) fileInput.value = '';
   }
 }
 
@@ -267,16 +328,6 @@ function switchMainMode(mode) {
   }
 }
 
-function updateResultTableDisplay() {
-  const currentResult = state.decompositions[state.selectedVar];
-  renderResultTable(
-    'resultTableContainer',
-    state.timestamps,
-    currentResult,
-    state.selectedVar,
-    state.decompositions
-  );
-}
 
 function updateTableEditorDisplay() {
   if (state.rawRows && state.rawRows.length > 0) {
@@ -351,6 +402,7 @@ function populateSelects() {
 
 function runDecompositionForAllVars() {
   state.decompositions = {};
+  state.analytics = {};
 
   // Extract raw time-series for target column 1 to interpolate timestamps
   const rawExtract = extractTimeSeries(state.rawRows, state.timeCol, state.valueCols[0]);
@@ -375,12 +427,40 @@ function runDecompositionForAllVars() {
         seasonalWindow: state.seasonalMode === 'periodic' ? 'periodic' : 7
       });
       state.decompositions[varName] = result;
+      runAnalyticsForVar(varName);
     }
   });
 
   updateChartDisplay();
   updateResultTableDisplay();
   updateSummaryStats();
+}
+
+function runAnalyticsForVar(varName) {
+  const res = state.decompositions[varName];
+  if (!res || !state.timestamps.length) return;
+
+  const changePoints = detectTrendChangePoints(state.timestamps, res.trend, {
+    period: state.period,
+    sensitivity: state.cpSensitivity
+  });
+
+  const isMultiplicative = res._autoDetected === 'multiplicative' || state.model === 'multiplicative';
+  const cusumResult = calculateResidualCusum(state.timestamps, res.residual, {
+    sensitivity: state.cusumSensitivity,
+    multiplicative: isMultiplicative
+  });
+
+  state.analytics[varName] = {
+    changePoints,
+    cusumResult
+  };
+}
+
+function runAnalyticsForAllVars() {
+  Object.keys(state.decompositions).forEach(varName => {
+    runAnalyticsForVar(varName);
+  });
 }
 
 function getBestStlDecompose(values, options) {
@@ -449,6 +529,7 @@ function runDecompositionForSelectedVar() {
   });
 
   state.decompositions[state.selectedVar] = result;
+  runAnalyticsForVar(state.selectedVar);
 
   updateChartDisplay();
   updateResultTableDisplay();
@@ -459,6 +540,8 @@ function updateChartDisplay() {
   const currentResult = state.decompositions[state.selectedVar];
   if (!currentResult || !state.timestamps.length) return;
 
+  const currentAnalytics = state.analytics[state.selectedVar] || { changePoints: [], cusumResult: null };
+
   renderChart(
     'chartContainer',
     state.timestamps,
@@ -466,7 +549,26 @@ function updateChartDisplay() {
     state.viewMode,
     state.selectedVar,
     state.customTitle,
-    state.bgMode
+    state.bgMode,
+    {
+      showChangePoints: state.showChangePoints,
+      showCusumAlerts: state.showCusumAlerts,
+      changePoints: currentAnalytics.changePoints || [],
+      cusumResult: currentAnalytics.cusumResult || null
+    }
+  );
+}
+
+function updateResultTableDisplay() {
+  const res = state.decompositions[state.selectedVar];
+  const currentAnalytics = state.analytics[state.selectedVar] || {};
+  renderResultTable(
+    'resultTableContainer',
+    state.timestamps,
+    res,
+    state.selectedVar,
+    state.decompositions,
+    currentAnalytics
   );
 }
 
@@ -532,19 +634,46 @@ function updateSummaryStats() {
 
   // 影響度の比較と総合評価
   if (trendRatio > seasonalRatio * 1.5) {
-    comment += `<strong>▪ 総合評価</strong><br>周期的な振れ幅よりも長期トレンドの変動幅の方が大きく、全体としては<strong>「トレンド（${trendDir}傾向）の影響」をより強く受けている</strong>データと言えます。`;
+    comment += `<strong>▪ 総合評価</strong><br>周期的な振れ幅よりも長期トレンドの変動幅の方が大きく、全体としては<strong>「トレンド（${trendDir}傾向）の影響」をより強く受けている</strong>データと言えます。<br><br>`;
   } else if (seasonalRatio > trendRatio * 1.5) {
-    comment += `<strong>▪ 総合評価</strong><br>長期的なトレンドの変化よりも周期的な振れ幅の方が大きく、全体としては<strong>「強い周期変動（季節性）の影響」をより強く受けている</strong>データと言えます。`;
+    comment += `<strong>▪ 総合評価</strong><br>長期的なトレンドの変化よりも周期的な振れ幅の方が大きく、全体としては<strong>「強い周期変動（季節性）の影響」をより強く受けている</strong>データと言えます。<br><br>`;
   } else {
-    comment += `<strong>▪ 総合評価</strong><br>トレンドの変動幅と周期変動の振れ幅が同程度であり、<strong>「長期的な傾向」と「周期的な波」の双方が同程度の影響を与え合って</strong>構成されています。`;
+    comment += `<strong>▪ 総合評価</strong><br>トレンドの変動幅と周期変動の振れ幅が同程度であり、<strong>「長期的な傾向」と「周期的な波」の双方が同程度の影響を与え合って</strong>構成されています。<br><br>`;
   }
 
   // 残差の評価
   const obsRange = obsMax - obsMin;
   if ((resSD * 4) / obsRange > 0.4) {
-    comment += `また、残差（不規則変動）のばらつきが比較的大きいため、異常値やノイズなど突発的な要因の影響も強く含まれています。`;
+    comment += `<strong>▪ 残差の評価:</strong> 残差（不規則変動）のばらつきが比較的大きいため、異常値やノイズなど突発的な要因の影響も強く含まれています。<br>`;
   } else {
-    comment += `残差（不規則変動）は比較的小さく、データの大半はトレンドと周期性の2つで綺麗に説明できています。`;
+    comment += `<strong>▪ 残差の評価:</strong> 残差（不規則変動）は比較的小さく、データの大半はトレンドと周期性の2つで綺麗に説明できています。<br>`;
+  }
+
+  // 変化点とCUSUMの診断サマリ
+  const currentAnalytics = state.analytics[state.selectedVar];
+  if (currentAnalytics) {
+    // トレンド変化点サマリ
+    if (currentAnalytics.changePoints && currentAnalytics.changePoints.length > 0) {
+      comment += `<br><strong>▪ トレンドの主な変化点 (${currentAnalytics.changePoints.length}箇所検出)</strong><br>`;
+      currentAnalytics.changePoints.forEach(cp => {
+        comment += `・<strong>${cp.timestamp}</strong>: 📍 ${cp.label}（${cp.description}）<br>`;
+      });
+    }
+
+    // CUSUM診断サマリ
+    if (currentAnalytics.cusumResult) {
+      const { cusumResult } = currentAnalytics;
+      comment += `<br><strong>▪ 残差のCUSUM診断 (累積和法: 管理限界 ±${cusumResult.h.toFixed(1)})</strong><br>`;
+      if (cusumResult.hasAnomaly && cusumResult.anomalies.length > 0) {
+        comment += `⚠️ <strong>管理限界超過（持続的なシフト）を検知しました:</strong><br>`;
+        cusumResult.anomalies.forEach(anom => {
+          comment += `・${anom.description}<br>`;
+        });
+        comment += `※ 一時的なノイズではなく、一定期間にわたる平均水準の偏り（構造変化や外生要因）を示唆しています。<br>`;
+      } else {
+        comment += `✅ <strong>安定（管理限界内）:</strong> 残差は特定方向への偏り（ドリフト）がなく、平均0の定常的なランダムノイズとして良好に推移しています。<br>`;
+      }
+    }
   }
 
   document.getElementById('analysisComment').innerHTML = comment;

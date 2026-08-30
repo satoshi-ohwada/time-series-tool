@@ -43,8 +43,35 @@ export function parsePastedText(text) {
 }
 
 /**
- * Parses Excel or CSV ArrayBuffer/File object using SheetJS
+ * Automatically decodes ArrayBuffer of CSV into text, supporting UTF-8 and Shift_JIS (CP932)
  * @param {ArrayBuffer} buffer 
+ * @returns {string} Decoded text
+ */
+export function decodeCsvBuffer(buffer) {
+  const bytes = new Uint8Array(buffer);
+  // Check UTF-8 BOM
+  if (bytes.length >= 3 && bytes[0] === 0xEF && bytes[1] === 0xBB && bytes[2] === 0xBF) {
+    return new TextDecoder('utf-8').decode(bytes.slice(3));
+  }
+  // Try UTF-8 with fatal: true to detect invalid sequences
+  try {
+    const utf8Decoder = new TextDecoder('utf-8', { fatal: true });
+    return utf8Decoder.decode(bytes);
+  } catch (e) {
+    // If UTF-8 fails, fallback to Shift_JIS (common in Japanese Excel exports)
+    try {
+      const sjisDecoder = new TextDecoder('shift-jis');
+      return sjisDecoder.decode(bytes);
+    } catch (e2) {
+      return new TextDecoder('utf-8').decode(bytes);
+    }
+  }
+}
+
+/**
+ * Parses Excel or CSV ArrayBuffer/File object using SheetJS
+ * @param {ArrayBuffer|string} data 
+ * @param {boolean} [isText=false]
  * @returns {Array<Object>} Parsed row objects
  */
 export function parseFileBuffer(data, isText = false) {
@@ -110,8 +137,9 @@ export function detectColumns(rows) {
       const val = rows[i][key];
       if (val !== '' && val !== null && val !== undefined) {
         totalCount++;
-        const num = Number(val);
-        if (!isNaN(num)) {
+        const cleanedStr = String(val).replace(/,/g, '').trim();
+        const num = Number(cleanedStr);
+        if (!isNaN(num) && cleanedStr !== '') {
           validCount++;
         }
       }

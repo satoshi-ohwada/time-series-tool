@@ -11,8 +11,9 @@ import { exportSingleVariableCSV, exportAllVariablesCSV } from './exporter.js';
  * @param {object} stlResult - { observed, trend, seasonal, residual }
  * @param {string} varName - Selected variable name
  * @param {Object<string, object>} [allDecompositions] - All variables decompositions map
+ * @param {object} [analyticsOptions] - { changePoints, cusumResult }
  */
-export function renderResultTable(containerId, timestamps, stlResult, varName, allDecompositions = {}) {
+export function renderResultTable(containerId, timestamps, stlResult, varName, allDecompositions = {}, analyticsOptions = {}) {
   const container = document.getElementById(containerId);
   if (!container) return;
 
@@ -23,6 +24,18 @@ export function renderResultTable(containerId, timestamps, stlResult, varName, a
 
   const { observed, trend, seasonal, residual } = stlResult;
   const hasMultipleVars = Object.keys(allDecompositions).length > 1;
+
+  const { changePoints = [], cusumResult = null } = analyticsOptions;
+
+  // Build quick lookup maps for change points and cusum anomalies
+  const cpMap = new Map();
+  if (changePoints) {
+    for (const cp of changePoints) {
+      cpMap.set(cp.index, cp);
+    }
+  }
+
+  const hasCusumAnomalies = cusumResult && cusumResult.anomalyIndices;
 
   let html = `
     <div class="result-table-toolbar">
@@ -45,6 +58,7 @@ export function renderResultTable(containerId, timestamps, stlResult, varName, a
             <th>トレンド (Trend)</th>
             <th>周期変動 (Seasonal)</th>
             <th>残差 (Residual)</th>
+            <th>診断 (変化点 / 異常)</th>
           </tr>
         </thead>
         <tbody>
@@ -56,14 +70,29 @@ export function renderResultTable(containerId, timestamps, stlResult, varName, a
     const sea = seasonal[i] !== undefined ? seasonal[i].toLocaleString(undefined, { maximumFractionDigits: 4 }) : '';
     const res = residual[i] !== undefined ? residual[i].toLocaleString(undefined, { maximumFractionDigits: 4 }) : '';
 
+    const cp = cpMap.get(i);
+    const isCusumAlert = hasCusumAnomalies && cusumResult.anomalyIndices[i];
+
+    let diagHtml = '';
+    if (cp) {
+      diagHtml += `<span class="badge-diag badge-cp" title="${escapeHtml(cp.description)}">📍 ${escapeHtml(cp.label)}</span> `;
+    }
+    if (isCusumAlert) {
+      diagHtml += `<span class="badge-diag badge-cusum" title="残差がCUSUM管理限界を超過">⚠️ CUSUM異常</span>`;
+    }
+    if (!diagHtml) {
+      diagHtml = '<span class="text-sub">-</span>';
+    }
+
     html += `
-      <tr>
+      <tr class="${cp ? 'row-has-cp' : ''} ${isCusumAlert ? 'row-has-cusum' : ''}">
         <td class="row-num-col">${i + 1}</td>
         <td><strong>${escapeHtml(timestamps[i])}</strong></td>
         <td class="num-cell val-observed">${obs}</td>
         <td class="num-cell val-trend">${trd}</td>
         <td class="num-cell val-seasonal">${sea}</td>
         <td class="num-cell val-residual">${res}</td>
+        <td>${diagHtml}</td>
       </tr>
     `;
   }
@@ -80,7 +109,7 @@ export function renderResultTable(containerId, timestamps, stlResult, varName, a
   const downloadBtn = container.querySelector('#downloadResultTableCsvBtn');
   if (downloadBtn) {
     downloadBtn.addEventListener('click', () => {
-      exportSingleVariableCSV(timestamps, stlResult, varName);
+      exportSingleVariableCSV(timestamps, stlResult, varName, analyticsOptions);
     });
   }
 

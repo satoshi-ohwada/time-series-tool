@@ -8,20 +8,42 @@
  * @param {string[]} timestamps 
  * @param {object} stlResult - { observed, trend, seasonal, residual }
  * @param {string} varName 
+ * @param {object} [analyticsOptions] - { changePoints, cusumResult }
  */
-export function exportSingleVariableCSV(timestamps, stlResult, varName) {
-  const headers = ['日付', `${varName}_元データ`, `${varName}_トレンド`, `${varName}_周期変動`, `${varName}_残差`].join(',');
-  const rows = [headers];
+export function exportSingleVariableCSV(timestamps, stlResult, varName, analyticsOptions = {}) {
+  const { changePoints = [], cusumResult = null } = analyticsOptions;
+  const cpMap = new Map();
+  if (changePoints) {
+    for (const cp of changePoints) cpMap.set(cp.index, cp.label);
+  }
 
+  const hasCusum = cusumResult && cusumResult.anomalyIndices;
+
+  const headerCols = [
+    '日付',
+    `${varName}_元データ`,
+    `${varName}_トレンド`,
+    `${varName}_周期変動`,
+    `${varName}_残差`,
+    `${varName}_トレンド変化点`,
+    `${varName}_CUSUM異常フラグ`
+  ];
+
+  const rows = [headerCols.join(',')];
   const { observed, trend, seasonal, residual } = stlResult;
 
   for (let i = 0; i < timestamps.length; i++) {
+    const cpLabel = cpMap.get(i) || '';
+    const cusumFlag = hasCusum && cusumResult.anomalyIndices[i] ? '1' : '0';
+
     const row = [
       formatCSVField(timestamps[i]),
       observed[i] !== undefined ? observed[i] : '',
       trend[i] !== undefined ? trend[i] : '',
       seasonal[i] !== undefined ? seasonal[i] : '',
-      residual[i] !== undefined ? residual[i] : ''
+      residual[i] !== undefined ? residual[i] : '',
+      formatCSVField(cpLabel),
+      cusumFlag
     ].join(',');
     rows.push(row);
   }
