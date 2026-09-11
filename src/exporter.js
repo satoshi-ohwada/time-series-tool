@@ -24,6 +24,7 @@ export function exportSingleVariableCSV(timestamps, stlResult, varName, analytic
     `${varName}_元データ`,
     `${varName}_トレンド`,
     `${varName}_周期変動`,
+    `${varName}_周期調整済`,
     `${varName}_残差`,
     `${varName}_トレンド変化点`,
     `${varName}_CUSUM異常フラグ`
@@ -31,6 +32,10 @@ export function exportSingleVariableCSV(timestamps, stlResult, varName, analytic
 
   const rows = [headerCols.join(',')];
   const { observed, trend, seasonal, residual } = stlResult;
+  let adjusted = stlResult.adjusted;
+  if (!adjusted && observed && seasonal) {
+    adjusted = observed.map((obs, i) => obs - seasonal[i]);
+  }
 
   for (let i = 0; i < timestamps.length; i++) {
     const cpLabel = cpMap.get(i) || '';
@@ -41,6 +46,7 @@ export function exportSingleVariableCSV(timestamps, stlResult, varName, analytic
       observed[i] !== undefined ? observed[i] : '',
       trend[i] !== undefined ? trend[i] : '',
       seasonal[i] !== undefined ? seasonal[i] : '',
+      adjusted && adjusted[i] !== undefined ? adjusted[i] : '',
       residual[i] !== undefined ? residual[i] : '',
       formatCSVField(cpLabel),
       cusumFlag
@@ -64,7 +70,13 @@ export function exportAllVariablesCSV(timestamps, allDecompositions) {
 
   const headerCols = ['日付'];
   varNames.forEach(varName => {
-    headerCols.push(`${varName}_元データ`, `${varName}_トレンド`, `${varName}_周期変動`, `${varName}_残差`);
+    headerCols.push(
+      `${varName}_元データ`,
+      `${varName}_トレンド`,
+      `${varName}_周期変動`,
+      `${varName}_周期調整済`,
+      `${varName}_残差`
+    );
   });
   const rows = [headerCols.join(',')];
 
@@ -72,10 +84,12 @@ export function exportAllVariablesCSV(timestamps, allDecompositions) {
     const rowCols = [formatCSVField(timestamps[i])];
     varNames.forEach(varName => {
       const res = allDecompositions[varName];
+      const adj = res.adjusted ? res.adjusted[i] : (res.observed[i] !== undefined && res.seasonal[i] !== undefined ? res.observed[i] - res.seasonal[i] : '');
       rowCols.push(
         res.observed[i] !== undefined ? res.observed[i] : '',
         res.trend[i] !== undefined ? res.trend[i] : '',
         res.seasonal[i] !== undefined ? res.seasonal[i] : '',
+        adj !== undefined ? adj : '',
         res.residual[i] !== undefined ? res.residual[i] : ''
       );
     });
@@ -95,7 +109,7 @@ function formatCSVField(field) {
 }
 
 function sanitizeFilename(filename) {
-  return filename.replace(/[^a-zA-Z0-9_\-\u4e00-\u9fa5\u3040-\u309f\u30a0-\u30ff]/g, '_');
+  return filename.replace(/[/\\?%*:|"<>]/g, '_');
 }
 
 function triggerDownload(content, filename) {

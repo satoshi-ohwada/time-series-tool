@@ -23,6 +23,10 @@ export function renderResultTable(containerId, timestamps, stlResult, varName, a
   }
 
   const { observed, trend, seasonal, residual } = stlResult;
+  let adjusted = stlResult.adjusted;
+  if (!adjusted && observed && seasonal) {
+    adjusted = observed.map((obs, i) => obs - seasonal[i]);
+  }
   const hasMultipleVars = Object.keys(allDecompositions).length > 1;
 
   const { changePoints = [], cusumResult = null } = analyticsOptions;
@@ -36,6 +40,8 @@ export function renderResultTable(containerId, timestamps, stlResult, varName, a
   }
 
   const hasCusumAnomalies = cusumResult && cusumResult.anomalyIndices;
+
+  const formatNum = (v) => (typeof v === 'number' && !isNaN(v) ? v.toLocaleString(undefined, { maximumFractionDigits: 4 }) : '-');
 
   let html = `
     <div class="result-table-toolbar">
@@ -57,6 +63,7 @@ export function renderResultTable(containerId, timestamps, stlResult, varName, a
             <th>元データ (Observed)</th>
             <th>トレンド (Trend)</th>
             <th>周期変動 (Seasonal)</th>
+            <th>周期調整済 (Adjusted)</th>
             <th>残差 (Residual)</th>
             <th>診断 (変化点 / 異常)</th>
           </tr>
@@ -65,10 +72,11 @@ export function renderResultTable(containerId, timestamps, stlResult, varName, a
   `;
 
   for (let i = 0; i < timestamps.length; i++) {
-    const obs = observed[i] !== undefined ? observed[i].toLocaleString(undefined, { maximumFractionDigits: 4 }) : '';
-    const trd = trend[i] !== undefined ? trend[i].toLocaleString(undefined, { maximumFractionDigits: 4 }) : '';
-    const sea = seasonal[i] !== undefined ? seasonal[i].toLocaleString(undefined, { maximumFractionDigits: 4 }) : '';
-    const res = residual[i] !== undefined ? residual[i].toLocaleString(undefined, { maximumFractionDigits: 4 }) : '';
+    const obs = formatNum(observed[i]);
+    const trd = formatNum(trend[i]);
+    const sea = formatNum(seasonal[i]);
+    const adj = formatNum(adjusted ? adjusted[i] : undefined);
+    const res = formatNum(residual[i]);
 
     const cp = cpMap.get(i);
     const isCusumAlert = hasCusumAnomalies && cusumResult.anomalyIndices[i];
@@ -91,6 +99,7 @@ export function renderResultTable(containerId, timestamps, stlResult, varName, a
         <td class="num-cell val-observed">${obs}</td>
         <td class="num-cell val-trend">${trd}</td>
         <td class="num-cell val-seasonal">${sea}</td>
+        <td class="num-cell val-adjusted">${adj}</td>
         <td class="num-cell val-residual">${res}</td>
         <td>${diagHtml}</td>
       </tr>

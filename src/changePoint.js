@@ -71,7 +71,8 @@ export function detectTrendChangePoints(timestamps, trend, options = {}) {
       const dropLeft = val - trend[i - halfWin];
       const dropRight = val - trend[i + halfWin];
       const drop = (dropLeft + dropRight) / 2;
-      const score = Math.min(1, (drop / trendRange) * 4);
+      const slopeReversal = Math.abs(slopeDiff);
+      const score = Math.min(1, (slopeReversal / (trendRange / period)) * 1.5 + (drop / trendRange) * 2);
 
       if (score >= scoreThreshold * 0.7) {
         candidates.push({
@@ -92,7 +93,8 @@ export function detectTrendChangePoints(timestamps, trend, options = {}) {
       const riseLeft = trend[i - halfWin] - val;
       const riseRight = trend[i + halfWin] - val;
       const rise = (riseLeft + riseRight) / 2;
-      const score = Math.min(1, (rise / trendRange) * 4);
+      const slopeReversal = Math.abs(slopeDiff);
+      const score = Math.min(1, (slopeReversal / (trendRange / period)) * 1.5 + (rise / trendRange) * 2);
 
       if (score >= scoreThreshold * 0.7) {
         candidates.push({

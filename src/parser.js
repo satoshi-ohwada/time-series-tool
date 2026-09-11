@@ -159,6 +159,7 @@ export function detectColumns(rows) {
 
 /**
  * Detects periodicity (seasonal period) using Autocorrelation Function (ACF)
+ * Uses both 1st-differenced and raw series to prevent trend domination from masking periodic peaks.
  * @param {number[]} values 
  * @param {string[]} [timestamps]
  * @returns {number} Estimated period (defaults to 12 if undetermined)
@@ -167,55 +168,129 @@ export function detectPeriodicity(values, timestamps = []) {
   const n = values.length;
   if (n < 6) return 12; // Default for very short series
 
-  const mean = values.reduce((a, b) => a + b, 0) / n;
-  let variance = 0;
-  for (let i = 0; i < n; i++) {
-    variance += (values[i] - mean) * (values[i] - mean);
-  }
-
-  if (variance < 1e-12) return 12;
-
-  const maxLag = Math.min(Math.floor(n / 2), 365);
-  const acf = new Array(maxLag + 1).fill(0);
-
-  for (let k = 1; k <= maxLag; k++) {
-    let num = 0;
-    for (let i = 0; i < n - k; i++) {
-      num += (values[i] - mean) * (values[i + k] - mean);
+  // Helper to calculate ACF and locate dominant local maxima
+  function getAcfPeaks(series) {
+    const m = series.length;
+    if (m < 6) return [];
+    const mean = series.reduce((a, b) => a + b, 0) / m;
+    let variance = 0;
+    for (let i = 0; i < m; i++) {
+      variance += (series[i] - mean) * (series[i] - mean);
     }
-    acf[k] = num / variance;
-  }
+    if (variance < 1e-12) return [];
 
-  // Find peaks in ACF (local maxima with positive correlation)
-  const peaks = [];
-  for (let k = 2; k < maxLag - 1; k++) {
-    if (acf[k] > acf[k - 1] && acf[k] > acf[k + 1] && acf[k] > 0.15) {
-      peaks.push({ lag: k, corr: acf[k] });
+    const maxLag = Math.min(Math.floor(m / 2), 365);
+    const acf = new Array(maxLag + 1).fill(0);
+    for (let k = 1; k <= maxLag; k++) {
+      let num = 0;
+      for (let i = 0; i < m - k; i++) {
+        num += (series[i] - mean) * (series[i + k] - mean);
+      }
+      acf[k] = num / variance;
     }
+
+    const peaks = [];
+    for (let k = 2; k < maxLag - 1; k++) {
+      if (acf[k] > acf[k - 1] && acf[k] > acf[k + 1] && acf[k] > 0.15) {
+        peaks.push({ lag: k, corr: acf[k] });
+      }
+    }
+    peaks.sort((a, b) => b.corr - a.corr);
+    return peaks;
   }
 
-  // Sort peaks by correlation strength
-  peaks.sort((a, b) => b.corr - a.corr);
+  // 1. Calculate ACF on differenced series to eliminate linear and polynomial trends
+  const diffValues = [];
+  for (let i = 1; i < n; i++) {
+    diffValues.push(values[i] - values[i - 1]);
+  }
+  const diffPeaks = getAcfPeaks(diffValues);
+  const rawPeaks = getAcfPeaks(values);
 
-  if (peaks.length > 0) {
-    return peaks[0].lag;
+  // If differenced series found a strong peak (corr > 0.2), prefer it
+  if (diffPeaks.length > 0 && diffPeaks[0].corr > 0.2) {
+    return diffPeaks[0].lag;
+  }
+  if (rawPeaks.length > 0 && rawPeaks[0].corr > 0.2) {
+    return rawPeaks[0].lag;
+  }
+  if (diffPeaks.length > 0) {
+    return diffPeaks[0].lag;
+  }
+  if (rawPeaks.length > 0) {
+    return rawPeaks[0].lag;
   }
 
   // Fallback heuristic based on timestamps if available
   if (timestamps.length >= 2) {
-    const d1 = new Date(timestamps[0]);
-    const d2 = new Date(timestamps[1]);
-    if (!isNaN(d1.getTime()) && !isNaN(d2.getTime())) {
-      const diffMs = Math.abs(d2.getTime() - d1.getTime());
+    const p1 = parseDateSafe(timestamps[0]);
+    const p2 = parseDateSafe(timestamps[1]);
+    if (p1 && p2) {
+      const diffMs = Math.abs(p2.date.getTime() - p1.date.getTime());
       const diffDays = diffMs / (1000 * 60 * 60 * 24);
 
       if (diffDays >= 25 && diffDays <= 32) return 12; // Monthly
       if (diffDays >= 6 && diffDays <= 8) return 52;   // Weekly
       if (diffDays >= 0.8 && diffDays <= 1.2) return 7; // Daily (Week seasonality)
+      if (diffDays >= 80 && diffDays <= 100) return 4; // Quarterly
     }
   }
 
   return 12; // Default fallback
+}
+
+/**
+ * Parses timestamp string into local Date and identifies format structure
+ */
+function parseDateSafe(t) {
+  if (typeof t !== 'string') return null;
+  const s = t.trim();
+  const mMonth = s.match(/^(\d{4})([\/\-])(\d{1,2})$/);
+  if (mMonth) {
+    return {
+      date: new Date(parseInt(mMonth[1]), parseInt(mMonth[3]) - 1, 1),
+      type: 'month',
+      sep: mMonth[2]
+    };
+  }
+  const mDay = s.match(/^(\d{4})([\/\-])(\d{1,2})([\/\-])(\d{1,2})/);
+  if (mDay) {
+    return {
+      date: new Date(parseInt(mDay[1]), parseInt(mDay[3]) - 1, parseInt(mDay[5])),
+      type: 'day',
+      sep: mDay[2]
+    };
+  }
+  const d = new Date(s);
+  if (!isNaN(d.getTime())) {
+    return { date: d, type: 'generic', sep: '/' };
+  }
+  return null;
+}
+
+/**
+ * Formats a date by applying steps based on detected date format type (preserving original format)
+ */
+function formatInterpolatedDate(baseParsed, stepIndex, stepMs) {
+  const { date, type, sep } = baseParsed;
+  if (type === 'month') {
+    const newD = new Date(date.getFullYear(), date.getMonth() + stepIndex, 1);
+    const y = newD.getFullYear();
+    const m = String(newD.getMonth() + 1).padStart(2, '0');
+    return `${y}${sep}${m}`;
+  } else if (type === 'day') {
+    const newD = new Date(date.getFullYear(), date.getMonth(), date.getDate() + stepIndex);
+    const y = newD.getFullYear();
+    const m = String(newD.getMonth() + 1).padStart(2, '0');
+    const d = String(newD.getDate()).padStart(2, '0');
+    return `${y}${sep}${m}${sep}${d}`;
+  } else {
+    const newD = new Date(date.getTime() + stepIndex * stepMs);
+    const y = newD.getFullYear();
+    const m = String(newD.getMonth() + 1).padStart(2, '0');
+    const d = String(newD.getDate()).padStart(2, '0');
+    return `${y}${sep}${m}${sep}${d}`;
+  }
 }
 
 /**
@@ -230,19 +305,18 @@ export function interpolateMissingSeries(timestamps, values, enable = true) {
     return { timestamps: [...timestamps], values: [...values], interpolatedCount: 0 };
   }
 
-  // Parse dates to check if timestamps are valid dates
-  const parsedDates = timestamps.map(t => new Date(t));
-  const isValidDate = parsedDates.every(d => !isNaN(d.getTime()));
+  // Parse dates safely in local time
+  const parsedDates = timestamps.map(t => parseDateSafe(t));
+  const isValidDate = parsedDates.every(d => d !== null && !isNaN(d.date.getTime()));
 
   if (!isValidDate) {
-    // If not standard date, return as-is
     return { timestamps: [...timestamps], values: [...values], interpolatedCount: 0 };
   }
 
   // Calculate median time difference in milliseconds
   const diffs = [];
   for (let i = 1; i < parsedDates.length; i++) {
-    const diff = parsedDates[i].getTime() - parsedDates[i - 1].getTime();
+    const diff = parsedDates[i].date.getTime() - parsedDates[i - 1].date.getTime();
     if (diff > 0) diffs.push(diff);
   }
 
@@ -251,7 +325,8 @@ export function interpolateMissingSeries(timestamps, values, enable = true) {
   }
 
   diffs.sort((a, b) => a - b);
-  const medianDiff = diffs[Math.floor(diffs.length / 2)];
+  // Pick lower median to ensure minimal step size is used even with small sample sizes
+  const medianDiff = diffs[Math.floor((diffs.length - 1) / 2)];
 
   // Threshold to detect gaps (e.g. > 1.5 * medianDiff)
   const gapThreshold = medianDiff * 1.5;
@@ -261,32 +336,22 @@ export function interpolateMissingSeries(timestamps, values, enable = true) {
   let interpolatedCount = 0;
 
   for (let i = 0; i < timestamps.length - 1; i++) {
-    const currentDate = parsedDates[i];
-    const nextDate = parsedDates[i + 1];
+    const currentParsed = parsedDates[i];
+    const nextParsed = parsedDates[i + 1];
     const val1 = values[i];
     const val2 = values[i + 1];
 
     newTimestamps.push(timestamps[i]);
     newValues.push(val1);
 
-    const timeGap = nextDate.getTime() - currentDate.getTime();
+    const timeGap = nextParsed.date.getTime() - currentParsed.date.getTime();
 
     if (timeGap > gapThreshold) {
-      // Calculate how many steps missing
       const steps = Math.round(timeGap / medianDiff);
       const stepMs = timeGap / steps;
 
       for (let s = 1; s < steps; s++) {
-        const missingTimeMs = currentDate.getTime() + s * stepMs;
-        const missingDate = new Date(missingTimeMs);
-
-        // Format date string similar to original
-        let dateStr = missingDate.toISOString().split('T')[0];
-        if (timestamps[0].includes('/')) {
-          dateStr = dateStr.replace(/-/g, '/');
-        }
-
-        // Linear interpolation of value
+        const dateStr = formatInterpolatedDate(currentParsed, s, stepMs);
         const interpolatedVal = val1 + (val2 - val1) * (s / steps);
 
         newTimestamps.push(dateStr);
@@ -322,13 +387,28 @@ export function extractTimeSeries(rows, timeCol, valueCol) {
     let rawTime = row[timeCol];
     let timeStr = '';
     if (rawTime instanceof Date) {
-      timeStr = rawTime.toISOString().split('T')[0];
+      // Use local calendar year/month/date to avoid UTC timezone day-shifting (e.g. in JST)
+      const y = rawTime.getFullYear();
+      const m = String(rawTime.getMonth() + 1).padStart(2, '0');
+      const d = String(rawTime.getDate()).padStart(2, '0');
+      const hours = rawTime.getHours();
+      const minutes = rawTime.getMinutes();
+      if (hours !== 0 || minutes !== 0) {
+        const hh = String(hours).padStart(2, '0');
+        const mm = String(minutes).padStart(2, '0');
+        timeStr = `${y}/${m}/${d} ${hh}:${mm}`;
+      } else {
+        timeStr = `${y}/${m}/${d}`;
+      }
     } else if (rawTime !== undefined && rawTime !== null) {
       timeStr = String(rawTime).trim();
     }
 
     const rawVal = row[valueCol];
-    const val = Number(String(rawVal).replace(/,/g, ''));
+    if (rawVal === '' || rawVal === null || rawVal === undefined) return;
+    const cleanedStr = String(rawVal).replace(/,/g, '').trim();
+    if (cleanedStr === '') return;
+    const val = Number(cleanedStr);
 
     if (timeStr && !isNaN(val)) {
       timestamps.push(timeStr);

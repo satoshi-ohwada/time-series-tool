@@ -91,7 +91,7 @@ export function renderChart(
     plot_bgcolor: plotBg,
     font: { color: palette.text, family: 'Inter, "Noto Sans JP", sans-serif' },
     hoverlabel: commonHoverLabel,
-    margin: { t: 50, r: 30, l: 65, b: 80 },
+    margin: { t: 90, r: 30, l: 65, b: 65 },
     hovermode: 'x unified',
     autosize: true,
     showlegend: true,
@@ -101,7 +101,7 @@ export function renderChart(
       y: 1.02,
       xanchor: 'right',
       x: 1,
-      font: { color: palette.text }
+      font: { color: palette.text, size: 12 }
     }
   };
 
@@ -131,30 +131,49 @@ export function renderChart(
   }
 
   // Helper to build CUSUM Alert shaded bands
-  const buildCusumShades = (yRef = 'paper', y0 = 0, y1 = 1) => {
+  const buildCusumShades = (yRef = 'paper', y0 = 0, y1 = 1, xRef = 'x') => {
     if (!showCusumAlerts || !cusumResult || !cusumResult.anomalies || cusumResult.anomalies.length === 0) {
       return [];
     }
-    return cusumResult.anomalies.map(anom => {
-      // Find start and end timestamps or extend slightly for single point
+    const shapes = [];
+    cusumResult.anomalies.forEach(anom => {
       const startT = anom.startTime;
       const endT = anom.endTime;
-      return {
-        type: 'rect',
-        xref: 'x',
-        yref: yRef,
-        x0: startT,
-        x1: endT,
-        y0: y0,
-        y1: y1,
-        fillcolor: palette.alertShade,
-        line: {
-          color: palette.alertBorder,
-          width: 1,
-          dash: 'dot'
-        }
-      };
+      if (startT === endT) {
+        // Single-point anomaly: rect with x0 == x1 has 0 width, so draw a vertical marker line
+        shapes.push({
+          type: 'line',
+          xref: xRef,
+          yref: yRef,
+          x0: startT,
+          x1: startT,
+          y0: y0,
+          y1: y1,
+          line: {
+            color: palette.cusumLimit,
+            width: 2,
+            dash: 'dashdot'
+          }
+        });
+      } else {
+        shapes.push({
+          type: 'rect',
+          xref: xRef,
+          yref: yRef,
+          x0: startT,
+          x1: endT,
+          y0: y0,
+          y1: y1,
+          fillcolor: palette.alertShade,
+          line: {
+            color: palette.alertBorder,
+            width: 1,
+            dash: 'dot'
+          }
+        });
+      }
     });
+    return shapes;
   };
 
   // Helper to build Change Point vertical markers & lines
@@ -313,7 +332,15 @@ export function renderChart(
 
     const layout = {
       ...commonLayout,
-      title: { text: titleText, font: { size: 17, color: palette.text, weight: 700 } },
+      title: {
+        text: titleText,
+        font: { size: 16, color: palette.text, weight: 700 },
+        x: 0.02,
+        xanchor: 'left',
+        y: 0.98,
+        yanchor: 'top'
+      },
+      margin: { ...commonLayout.margin, t: 95 },
       xaxis: { ...commonXAxis, title: { text: '日時', font: { color: palette.subtext } } },
       yaxis: { ...commonYAxis, title: { text: '累積偏差 (CUSUM)', font: { color: palette.subtext } } },
       shapes: cusumShapes,
@@ -384,31 +411,54 @@ export function renderChart(
       shapes.push(...buildChangePointShapes('y2', Math.min(...trend), Math.max(...trend), 'x2'));
     }
 
-    // CUSUM alert shades on Residual subplot (y4)
+    // CUSUM alert shades and point markers on Residual subplot (y4)
     if (showCusumAlerts && cusumResult && cusumResult.anomalies) {
       const resMin = Math.min(...residual);
       const resMax = Math.max(...residual);
-      for (const anom of cusumResult.anomalies) {
-        shapes.push({
-          type: 'rect',
-          xref: 'x4',
-          yref: 'y4',
-          x0: anom.startTime,
-          x1: anom.endTime,
-          y0: resMin,
-          y1: resMax,
-          fillcolor: palette.alertShade,
-          line: { color: palette.alertBorder, width: 1, dash: 'dot' }
+      shapes.push(...buildCusumShades('y4', resMin, resMax, 'x4'));
+
+      // Highlight individual alarm points on y4
+      const alertX = [];
+      const alertY = [];
+      for (let i = 0; i < residual.length; i++) {
+        if (cusumResult.anomalyIndices && cusumResult.anomalyIndices[i]) {
+          alertX.push(timestamps[i]);
+          alertY.push(residual[i]);
+        }
+      }
+      if (alertX.length > 0) {
+        traces.push({
+          x: alertX,
+          y: alertY,
+          type: 'scatter',
+          mode: 'markers',
+          name: 'CUSUM異常点',
+          marker: {
+            size: 6,
+            color: palette.cusumLimit,
+            symbol: 'circle'
+          },
+          hoverinfo: 'text',
+          hovertext: alertX.map((t, idx) => `⚠️ CUSUM異常点<br>日時: ${t}<br>残差: ${alertY[idx].toFixed(2)}`),
+          xaxis: 'x4',
+          yaxis: 'y4'
         });
       }
     }
 
     const layout = {
       ...commonLayout,
-      title: { text: titleText, font: { size: 17, color: palette.text, weight: 700 } },
+      title: {
+        text: titleText,
+        font: { size: 16, color: palette.text, weight: 700 },
+        x: 0.02,
+        xanchor: 'left',
+        y: 0.98,
+        yanchor: 'top'
+      },
       grid: { rows: 4, columns: 1, sharex: true },
       showlegend: false,
-      margin: { t: 60, r: 30, l: 65, b: 70 },
+      margin: { t: 65, r: 30, l: 65, b: 65 },
       xaxis: { ...commonXAxis, anchor: 'y', showticklabels: false },
       yaxis: { ...commonYAxis, title: { text: 'Observed', font: { color: palette.subtext } } },
       xaxis2: { ...commonXAxis, anchor: 'y2', showticklabels: false },
@@ -573,7 +623,15 @@ export function renderChart(
 
   const layout = {
     ...commonLayout,
-    title: { text: titleText, font: { size: 17, color: palette.text, weight: 700 } },
+    title: {
+      text: titleText,
+      font: { size: 16, color: palette.text, weight: 700 },
+      x: 0.02,
+      xanchor: 'left',
+      y: 0.98,
+      yanchor: 'top'
+    },
+    margin: { ...commonLayout.margin, t: 90 },
     xaxis: commonXAxis,
     yaxis: commonYAxis,
     shapes: shapes,

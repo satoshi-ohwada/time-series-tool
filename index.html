@@ -85,7 +85,7 @@
               <button id="autoDetectPeriodBtn" class="badge-btn" title="データから周期を自動判定">✨ 自動推測</button>
             </div>
             <div class="period-input-group">
-              <input type="number" id="periodInput" class="form-control" value="12" min="1" max="365">
+              <input type="number" id="periodInput" class="form-control" value="12" min="2" max="365">
               <select id="periodPresetSelect" class="form-control preset-select">
                 <option value="">単位プリセット</option>
                 <option value="12">月 (12 / 年周期)</option>
@@ -95,7 +95,6 @@
                 <option value="2">半期 (2 / 年周期)</option>
                 <option value="52">週 (52 / 年周期)</option>
                 <option value="365">日 (365 / 年周期)</option>
-                <option value="1">年 (1)</option>
               </select>
             </div>
             <p id="periodDetectBadge" class="form-help">データの自交相関(ACF)から周期を自動解析します</p>

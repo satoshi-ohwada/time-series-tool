@@ -132,23 +132,42 @@ function initEventListeners() {
   // Column Selectors Change
   timeColSelect.addEventListener('change', (e) => {
     state.timeCol = e.target.value;
-    runDecompositionForSelectedVar();
+    // Re-detect columns and remove new timeCol from available valueCols
+    const detected = detectColumns(state.rawRows);
+    state.valueCols = detected.valueCols.filter(c => c !== state.timeCol);
+    if (state.valueCols.length === 0) {
+      const keys = Object.keys(state.rawRows[0] || {});
+      state.valueCols = keys.filter(k => k !== state.timeCol);
+    }
+    if (!state.valueCols.includes(state.selectedVar)) {
+      state.selectedVar = state.valueCols[0] || '';
+    }
+    populateSelects();
+    runDecompositionForAllVars();
   });
+
   valueColSelect.addEventListener('change', (e) => {
     state.selectedVar = e.target.value;
-    runDecompositionForSelectedVar();
+    if (!state.decompositions[state.selectedVar]) {
+      runDecompositionForSelectedVar();
+    } else {
+      updateChartDisplay();
+      updateResultTableDisplay();
+      updateSummaryStats();
+    }
   });
 
   // Period Settings & Auto Detect
   periodInput.addEventListener('change', (e) => {
-    state.period = Math.max(1, parseInt(e.target.value) || 12);
-    runDecompositionForSelectedVar();
+    state.period = Math.max(2, parseInt(e.target.value) || 12);
+    periodInput.value = state.period;
+    runDecompositionForAllVars();
   });
   periodPresetSelect.addEventListener('change', (e) => {
     if (e.target.value) {
-      periodInput.value = e.target.value;
-      state.period = parseInt(e.target.value);
-      runDecompositionForSelectedVar();
+      state.period = Math.max(2, parseInt(e.target.value));
+      periodInput.value = state.period;
+      runDecompositionForAllVars();
     }
   });
 
@@ -156,10 +175,10 @@ function initEventListeners() {
     if (!state.selectedVar || !state.rawRows.length) return;
     const { timestamps, values } = extractTimeSeries(state.rawRows, state.timeCol, state.selectedVar);
     const autoPeriod = detectPeriodicity(values, timestamps);
-    state.period = autoPeriod;
-    periodInput.value = autoPeriod;
-    periodDetectBadge.textContent = `✨ 自動判定結果: 推奨周期 = ${autoPeriod}`;
-    runDecompositionForSelectedVar();
+    state.period = Math.max(2, autoPeriod);
+    periodInput.value = state.period;
+    periodDetectBadge.textContent = `✨ 自動判定結果: 推奨周期 = ${state.period}`;
+    runDecompositionForAllVars();
   });
 
   autoInterpolateCheck.addEventListener('change', (e) => {
@@ -168,12 +187,12 @@ function initEventListeners() {
   });
   modelSelect.addEventListener('change', (e) => {
     state.model = e.target.value;
-    runDecompositionForSelectedVar();
+    runDecompositionForAllVars();
   });
   if (seasonalModeSelect) {
     seasonalModeSelect.addEventListener('change', (e) => {
       state.seasonalMode = e.target.value;
-      runDecompositionForSelectedVar();
+      runDecompositionForAllVars();
     });
   }
 
@@ -404,6 +423,15 @@ function runDecompositionForAllVars() {
   state.decompositions = {};
   state.analytics = {};
 
+  if (!state.rawRows || state.rawRows.length === 0 || !state.valueCols.length || !state.timeCol) {
+    state.timestamps = [];
+    interpolationNotice.classList.add('hidden');
+    updateChartDisplay();
+    updateResultTableDisplay();
+    updateSummaryStats();
+    return;
+  }
+
   // Extract raw time-series for target column 1 to interpolate timestamps
   const rawExtract = extractTimeSeries(state.rawRows, state.timeCol, state.valueCols[0]);
   const interpolatedBase = interpolateMissingSeries(rawExtract.timestamps, rawExtract.values, state.enableInterpolation);
@@ -464,12 +492,25 @@ function runAnalyticsForAllVars() {
 }
 
 function getBestStlDecompose(values, options) {
+  const hasNonPositive = values.some(v => v <= 0);
+
   if (options.modelMode !== 'auto') {
     return stlDecompose(values, {
       period: options.period,
       multiplicative: options.modelMode === 'multiplicative',
       seasonalWindow: options.seasonalWindow
     });
+  }
+
+  // Auto mode: Multiplicative model is strictly for positive series
+  if (hasNonPositive) {
+    const resAdd = stlDecompose(values, {
+      period: options.period,
+      multiplicative: false,
+      seasonalWindow: options.seasonalWindow
+    });
+    resAdd._autoDetected = 'additive';
+    return resAdd;
   }
 
   // Try Additive
@@ -486,7 +527,7 @@ function getBestStlDecompose(values, options) {
     seasonalWindow: options.seasonalWindow
   });
 
-  // Calculate Mean Absolute Error (MAE) for both models to pick the best fit
+  // Calculate Mean Absolute Error (MAE) for both models in original data units
   let maeAdd = 0, maeMul = 0;
   const n = values.length;
   for (let i = 0; i < n; i++) {
@@ -538,7 +579,21 @@ function runDecompositionForSelectedVar() {
 
 function updateChartDisplay() {
   const currentResult = state.decompositions[state.selectedVar];
-  if (!currentResult || !state.timestamps.length) return;
+  const container = document.getElementById('chartContainer');
+  if (!currentResult || !state.timestamps.length) {
+    if (container) {
+      if (window.Plotly) {
+        try { Plotly.purge(container); } catch (e) {}
+      }
+      container.innerHTML = `
+        <div class="empty-state">
+          <div class="empty-icon">📊</div>
+          <h3>データを読み込んでください</h3>
+          <p>左側のパネルから Excel/CSV ファイルをアップロードするか、データを直接貼り付けてください。</p>
+        </div>`;
+    }
+    return;
+  }
 
   const currentAnalytics = state.analytics[state.selectedVar] || { changePoints: [], cusumResult: null };
 
@@ -574,9 +629,21 @@ function updateResultTableDisplay() {
 
 function updateSummaryStats() {
   const res = state.decompositions[state.selectedVar];
-  if (!res) return;
+  if (!res || !res.observed || res.observed.length === 0) {
+    document.getElementById('statCount').textContent = '-';
+    document.getElementById('statMean').textContent = '-';
+    document.getElementById('statMedian').textContent = '-';
+    document.getElementById('statMax').textContent = '-';
+    document.getElementById('statMin').textContent = '-';
+    document.getElementById('statTrendRange').textContent = '-';
+    document.getElementById('statSeasonalRange').textContent = '-';
+    document.getElementById('statResidualSD').textContent = '-';
+    document.getElementById('analysisComment').innerHTML = '';
+    return;
+  }
 
   const count = res.observed.length;
+  const isMultiplicative = res._autoDetected === 'multiplicative' || state.model === 'multiplicative';
   
   // 元データの統計量
   const obsSorted = [...res.observed].sort((a, b) => a - b);
@@ -591,6 +658,7 @@ function updateSummaryStats() {
   const trendMax = Math.max(...res.trend);
   const trendMin = Math.min(...res.trend);
   const trendRange = trendMax - trendMin;
+  const trendMean = res.trend.reduce((a, b) => a + b, 0) / count;
 
   const seasonalMax = Math.max(...res.seasonal);
   const seasonalMin = Math.min(...res.seasonal);
@@ -609,19 +677,27 @@ function updateSummaryStats() {
 
   // DOM更新 (STL成分)
   document.getElementById('statTrendRange').textContent = Number(trendRange.toFixed(1)).toLocaleString();
-  document.getElementById('statSeasonalRange').textContent = Number(seasonalRange.toFixed(1)).toLocaleString();
-  document.getElementById('statResidualSD').textContent = Number(resSD.toFixed(2)).toLocaleString();
+  if (isMultiplicative) {
+    document.getElementById('statSeasonalRange').textContent = `${(seasonalRange * 100).toFixed(1)}% (比率幅: ${seasonalRange.toFixed(2)})`;
+    document.getElementById('statResidualSD').textContent = `${(resSD * 100).toFixed(1)}%`;
+  } else {
+    document.getElementById('statSeasonalRange').textContent = Number(seasonalRange.toFixed(1)).toLocaleString();
+    document.getElementById('statResidualSD').textContent = Number(resSD.toFixed(2)).toLocaleString();
+  }
 
   // 分析コメントの生成
-  const totalVar = trendRange + seasonalRange + (resSD * 4);
+  // 乗法モデルの場合は比率を平均トレンド水準に換算して単位を揃える
+  const effectiveSeasonalVariation = isMultiplicative ? seasonalRange * Math.abs(trendMean) : seasonalRange;
+  const effectiveResidualVariation = isMultiplicative ? (resSD * Math.abs(trendMean) * 4) : (resSD * 4);
+  const totalVar = Math.max(trendRange + effectiveSeasonalVariation + effectiveResidualVariation, 1e-6);
   const trendRatio = trendRange / totalVar;
-  const seasonalRatio = seasonalRange / totalVar;
+  const seasonalRatio = effectiveSeasonalVariation / totalVar;
 
   let comment = `<strong>【分析のヒント】</strong><br><br>`;
   
   if (state.model === 'auto' && res._autoDetected) {
     const modelName = res._autoDetected === 'multiplicative' ? '乗法モデル' : '加法モデル';
-    comment += `<strong>▪ 自動判定モデル: ${modelName}</strong><br>加法モデルと乗法モデルの両方を計算し、より残差が小さく綺麗に分解できた <strong>${modelName}</strong> を自動選択しました。<br><br>`;
+    comment += `<strong>▪ 自動判定モデル: ${modelName}</strong><br>加法モデルと乗法モデルの両方を比較し、より当てはまりの良い <strong>${modelName}</strong> を自動選択しました。<br><br>`;
   }
 
   // トレンドの解説
@@ -630,7 +706,11 @@ function updateSummaryStats() {
   comment += `<strong>▪ トレンド（長期的な傾向）</strong><br>期間全体を通じて概ね <strong>${Math.abs(trendDiff).toFixed(1)} ${trendDir}</strong> しており、期間内の最大変動幅は ${trendRange.toFixed(1)} です。<br><br>`;
 
   // 周期変動の解説
-  comment += `<strong>▪ 周期変動（季節性）</strong><br>設定した周期に従い、最大で <strong>${seasonalRange.toFixed(1)}</strong> の幅でデータが規則的に上下に振れています。<br><br>`;
+  if (isMultiplicative) {
+    comment += `<strong>▪ 周期変動（季節性 - 乗法比率）</strong><br>設定した周期に従い、トレンド水準に対して最大で <strong>${(seasonalRange * 100).toFixed(1)}%</strong>（比率 ${(seasonalMin).toFixed(2)} 〜 ${(seasonalMax).toFixed(2)}）の幅でデータが規則的に上下に振れています。<br><br>`;
+  } else {
+    comment += `<strong>▪ 周期変動（季節性）</strong><br>設定した周期に従い、最大で <strong>${seasonalRange.toFixed(1)}</strong> の幅でデータが規則的に上下に振れています。<br><br>`;
+  }
 
   // 影響度の比較と総合評価
   if (trendRatio > seasonalRatio * 1.5) {
@@ -643,8 +723,9 @@ function updateSummaryStats() {
 
   // 残差の評価
   const obsRange = obsMax - obsMin;
-  if ((resSD * 4) / obsRange > 0.4) {
-    comment += `<strong>▪ 残差の評価:</strong> 残差（不規則変動）のばらつきが比較的大きいため、異常値やノイズなど突発的な要因の影響も強く含まれています。<br>`;
+  const relativeRes = isMultiplicative ? resSD : (resSD * 4) / Math.max(obsRange, 1e-6);
+  if (relativeRes > (isMultiplicative ? 0.08 : 0.4)) {
+    comment += `<strong>▪ 残差の評価:</strong> 残差（不規則変動）のばらつきが比較的大きいため、異常値やノイズなど突発的な要因の影響も含まれています。<br>`;
   } else {
     comment += `<strong>▪ 残差の評価:</strong> 残差（不規則変動）は比較的小さく、データの大半はトレンドと周期性の2つで綺麗に説明できています。<br>`;
   }
@@ -663,7 +744,8 @@ function updateSummaryStats() {
     // CUSUM診断サマリ
     if (currentAnalytics.cusumResult) {
       const { cusumResult } = currentAnalytics;
-      comment += `<br><strong>▪ 残差のCUSUM診断 (累積和法: 管理限界 ±${cusumResult.h.toFixed(1)})</strong><br>`;
+      const hStr = isMultiplicative ? `${(cusumResult.h * 100).toFixed(1)}%` : cusumResult.h.toFixed(1);
+      comment += `<br><strong>▪ 残差のCUSUM診断 (累積和法: 管理限界 ±${hStr})</strong><br>`;
       if (cusumResult.hasAnomaly && cusumResult.anomalies.length > 0) {
         comment += `⚠️ <strong>管理限界超過（持続的なシフト）を検知しました:</strong><br>`;
         cusumResult.anomalies.forEach(anom => {
@@ -671,7 +753,7 @@ function updateSummaryStats() {
         });
         comment += `※ 一時的なノイズではなく、一定期間にわたる平均水準の偏り（構造変化や外生要因）を示唆しています。<br>`;
       } else {
-        comment += `✅ <strong>安定（管理限界内）:</strong> 残差は特定方向への偏り（ドリフト）がなく、平均0の定常的なランダムノイズとして良好に推移しています。<br>`;
+        comment += `✅ <strong>安定（管理限界内）:</strong> 残差は特定方向への偏り（ドリフト）がなく、定常的なランダムノイズとして良好に推移しています。<br>`;
       }
     }
   }
