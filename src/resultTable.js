@@ -1,7 +1,7 @@
 /**
  * STL Decomposition Result Table Viewer module
  */
-import { exportSingleVariableCSV, exportAllVariablesCSV } from './exporter.js';
+import { exportSingleVariableCSV, exportAllVariablesCSV } from './exporter.js?v=20';
 
 /**
  * Render STL decomposition calculation results as an interactive table
@@ -13,7 +13,7 @@ import { exportSingleVariableCSV, exportAllVariablesCSV } from './exporter.js';
  * @param {Object<string, object>} [allDecompositions] - All variables decompositions map
  * @param {object} [analyticsOptions] - { changePoints, cusumResult }
  */
-export function renderResultTable(containerId, timestamps, stlResult, varName, allDecompositions = {}, analyticsOptions = {}) {
+export function renderResultTable(containerId, timestamps, stlResult, varName, allDecompositions = {}, analyticsOptions = {}, hasMultipleVarsOverride = null) {
   const container = document.getElementById(containerId);
   if (!container) return;
 
@@ -27,7 +27,9 @@ export function renderResultTable(containerId, timestamps, stlResult, varName, a
   if (!adjusted && observed && seasonal) {
     adjusted = observed.map((obs, i) => obs - seasonal[i]);
   }
-  const hasMultipleVars = Object.keys(allDecompositions).length > 1;
+  const hasMultipleVars = hasMultipleVarsOverride !== null
+    ? hasMultipleVarsOverride
+    : (typeof allDecompositions === 'function' ? true : Object.keys(allDecompositions).length > 1);
 
   const { changePoints = [], cusumResult = null } = analyticsOptions;
 
@@ -125,7 +127,10 @@ export function renderResultTable(containerId, timestamps, stlResult, varName, a
   const downloadAllBtn = container.querySelector('#downloadAllVarsCsvBtn');
   if (downloadAllBtn) {
     downloadAllBtn.addEventListener('click', () => {
-      exportAllVariablesCSV(timestamps, allDecompositions);
+      const resolvedDecompositions = typeof allDecompositions === 'function'
+        ? allDecompositions()
+        : allDecompositions;
+      exportAllVariablesCSV(timestamps, resolvedDecompositions);
     });
   }
 }

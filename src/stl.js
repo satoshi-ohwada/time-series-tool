@@ -15,6 +15,10 @@ function tricube(x) {
 
 /**
  * Local Polynomial Regression (LOESS / LOWESS)
+ * Centered coordinate optimization: evaluates regression at xi (u = 0),
+ * which directly yields constant term `a` with reduced floating-point operations
+ * and avoids ill-conditioned sums for large indices.
+ * 
  * @param {number[]} x - Independent variable indices [0, 1, 2, ...]
  * @param {number[]} y - Dependent variable values
  * @param {number} span - Window span (number of points or fraction)
@@ -25,50 +29,52 @@ export function loess(x, y, span, robustWeights = null) {
   const n = x.length;
   const smoothed = new Array(n);
   const k = Math.min(n, Math.max(2, Math.floor(span)));
+  const scale = span > k ? span / k : 1.0001;
+
+  let left = 0;
+  let right = k - 1;
 
   for (let i = 0; i < n; i++) {
     const xi = x[i];
 
-    // Find k nearest neighbors to x[i]
-    const distances = new Array(n);
-    for (let j = 0; j < n; j++) {
-      distances[j] = { idx: j, dist: Math.abs(x[j] - xi) };
+    // Slide window [left, right] to maintain k nearest neighbors to xi (for sorted x)
+    while (right + 1 < n && Math.abs(x[right + 1] - xi) < Math.abs(x[left] - xi)) {
+      left++;
+      right++;
     }
-    distances.sort((a, b) => a.dist - b.dist);
 
-    const baseDist = distances[k - 1].dist;
-    // When span > k (e.g. small subseries), scale maxDist so all points have positive weights.
-    // Also apply 1.0001 so the k-th point is not given zero weight by tricube(1).
-    const scale = span > k ? span / k : 1.0001;
+    const baseDist = Math.max(Math.abs(xi - x[left]), Math.abs(x[right] - xi));
     const maxDist = Math.max(baseDist * scale, 1e-12);
 
-    let sumW = 0, sumWX = 0, sumWY = 0, sumWXX = 0, sumWXY = 0;
+    let sumW = 0, sumWU = 0, sumWUU = 0, sumWY = 0, sumWUY = 0;
 
-    for (let j = 0; j < k; j++) {
-      const idx = distances[j].idx;
-      const dist = distances[j].dist;
-      let w = tricube(dist / maxDist);
+    for (let j = left; j <= right; j++) {
+      const u = x[j] - xi;
+      const absU = Math.abs(u);
+      const ratio = absU / maxDist;
+      if (ratio >= 1) continue;
+
+      const tmp = 1 - ratio * ratio * ratio;
+      let w = tmp * tmp * tmp;
       if (robustWeights) {
-        w *= robustWeights[idx];
+        w *= robustWeights[j];
       }
 
-      const xj = x[idx];
-      const yj = y[idx];
+      const yj = y[j];
+      const wu = w * u;
 
       sumW += w;
-      sumWX += w * xj;
+      sumWU += wu;
+      sumWUU += wu * u;
       sumWY += w * yj;
-      sumWXX += w * xj * xj;
-      sumWXY += w * xj * yj;
+      sumWUY += wu * yj;
     }
 
-    const denom = sumW * sumWXX - sumWX * sumWX;
+    const denom = sumW * sumWUU - sumWU * sumWU;
     if (Math.abs(denom) < 1e-12) {
       smoothed[i] = sumW > 0 ? sumWY / sumW : y[i];
     } else {
-      const a = (sumWY * sumWXX - sumWX * sumWXY) / denom;
-      const b = (sumW * sumWXY - sumWX * sumWY) / denom;
-      smoothed[i] = a + b * xi;
+      smoothed[i] = (sumWY * sumWUU - sumWU * sumWUY) / denom;
     }
   }
 

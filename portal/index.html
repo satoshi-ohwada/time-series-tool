@@ -1,0 +1,963 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>データ分析・可視化 Webツール ポータル | Data Analytics Tools Portal</title>
+  <meta name="description" content="インストール不要、ブラウザ上で完全ローカル処理。Excelコピペですぐに使える統計・テキスト・多変量・時系列・地図分析Webツールポータル。">
+
+  <!-- Google Fonts (Inter & Noto Sans JP) with system fallback -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+JP:wght@400;500;700;800&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --primary: #2563eb;
+      --primary-hover: #1d4ed8;
+      --primary-light: #eff6ff;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --text-sub: #475569;
+      --bg-page: #f8fafc;
+      --bg-card: #ffffff;
+      --border-color: #e2e8f0;
+      --border-light: #f1f5f9;
+      --shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.06);
+      --shadow-md: 0 4px 16px -2px rgba(15, 23, 42, 0.08), 0 2px 6px -2px rgba(15, 23, 42, 0.04);
+      --shadow-lg: 0 12px 30px -4px rgba(15, 23, 42, 0.12), 0 4px 12px -2px rgba(15, 23, 42, 0.06);
+      --radius-sm: 8px;
+      --radius-md: 14px;
+      --radius-lg: 20px;
+      --radius-pill: 9999px;
+      --font-family: 'Inter', 'Noto Sans JP', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: var(--font-family);
+      background-color: var(--bg-page);
+      color: var(--text-main);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    a {
+      text-decoration: none;
+      color: inherit;
+    }
+
+    /* Container */
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 24px;
+    }
+
+    /* Header */
+    .site-header {
+      background: rgba(255, 255, 255, 0.85);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border-color);
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      padding: 16px 0;
+    }
+
+    .header-inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-weight: 800;
+      font-size: 1.15rem;
+      letter-spacing: -0.02em;
+    }
+
+    .brand-icon {
+      width: 36px;
+      height: 36px;
+      background: linear-gradient(135deg, #2563eb, #7c3aed);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      box-shadow: 0 3px 10px rgba(37, 99, 235, 0.3);
+    }
+
+    .header-meta {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+
+    .badge-secure {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: #f0fdf4;
+      color: #166534;
+      border: 1px solid #bbf7d0;
+      padding: 5px 12px;
+      border-radius: var(--radius-pill);
+      font-weight: 600;
+      font-size: 0.78rem;
+    }
+
+    /* Hero Section */
+    .hero {
+      padding: 56px 0 36px;
+      text-align: center;
+      position: relative;
+    }
+
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: #eff6ff;
+      color: #1d4ed8;
+      border: 1px solid #bfdbfe;
+      padding: 6px 14px;
+      border-radius: var(--radius-pill);
+      font-size: 0.84rem;
+      font-weight: 600;
+      margin-bottom: 20px;
+    }
+
+    .hero-title {
+      font-size: clamp(2rem, 4vw, 2.9rem);
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      line-height: 1.25;
+      margin-bottom: 16px;
+      background: linear-gradient(135deg, #0f172a 30%, #334155 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .hero-desc {
+      font-size: 1.05rem;
+      color: var(--text-muted);
+      max-width: 720px;
+      margin: 0 auto 32px;
+      line-height: 1.7;
+    }
+
+    /* Features Grid (Pillars) */
+    .features-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 16px;
+      margin-bottom: 44px;
+    }
+
+    .feature-item {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      padding: 16px 18px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      box-shadow: var(--shadow-sm);
+      text-align: left;
+    }
+
+    .feature-icon-wrapper {
+      width: 42px;
+      height: 42px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .feature-title {
+      font-size: 0.9rem;
+      font-weight: 700;
+      margin-bottom: 2px;
+      color: var(--text-main);
+    }
+
+    .feature-text {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      line-height: 1.4;
+    }
+
+    /* Purpose Filter (Quick Navigator) */
+    .filter-section {
+      margin-bottom: 36px;
+      text-align: center;
+    }
+
+    .filter-label {
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      margin-bottom: 12px;
+      display: block;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .filter-tabs {
+      display: inline-flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: center;
+      background: #e2e8f0;
+      padding: 6px;
+      border-radius: var(--radius-pill);
+    }
+
+    .filter-btn {
+      background: transparent;
+      border: none;
+      padding: 8px 18px;
+      border-radius: var(--radius-pill);
+      font-size: 0.86rem;
+      font-weight: 600;
+      color: var(--text-sub);
+      cursor: pointer;
+      transition: all 0.2s ease;
+      font-family: inherit;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .filter-btn:hover {
+      color: var(--text-main);
+    }
+
+    .filter-btn.active {
+      background: white;
+      color: var(--primary);
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+    }
+
+    /* Tools Grid */
+    .tools-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+      gap: 28px;
+      margin-bottom: 64px;
+    }
+
+    /* Tool Card */
+    .tool-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-lg);
+      padding: 30px 28px;
+      box-shadow: var(--shadow-md);
+      transition: all 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .tool-card:hover {
+      transform: translateY(-6px);
+      box-shadow: var(--shadow-lg);
+      border-color: #cbd5e1;
+    }
+
+    .tool-card::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 5px;
+      background: var(--card-gradient, linear-gradient(90deg, #2563eb, #60a5fa));
+    }
+
+    .card-top {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      margin-bottom: 18px;
+    }
+
+    .tool-icon-box {
+      width: 54px;
+      height: 54px;
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+    }
+
+    .tool-badge {
+      font-size: 0.75rem;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: var(--radius-pill);
+      background: #f1f5f9;
+      color: #475569;
+      letter-spacing: 0.02em;
+    }
+
+    .tool-title {
+      font-size: 1.25rem;
+      font-weight: 800;
+      color: var(--text-main);
+      margin-bottom: 10px;
+      line-height: 1.35;
+    }
+
+    .tool-desc {
+      font-size: 0.92rem;
+      color: var(--text-sub);
+      line-height: 1.65;
+      margin-bottom: 20px;
+      flex-grow: 1;
+    }
+
+    .tool-features {
+      border-top: 1px dashed var(--border-color);
+      padding-top: 16px;
+      margin-bottom: 24px;
+    }
+
+    .feature-list-title {
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .tag-container {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .feature-tag {
+      font-size: 0.76rem;
+      background: #f8fafc;
+      color: #334155;
+      border: 1px solid #e2e8f0;
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-weight: 500;
+    }
+
+    .card-footer {
+      margin-top: auto;
+    }
+
+    .btn-launch {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      width: 100%;
+      padding: 12px 18px;
+      border-radius: var(--radius-md);
+      font-weight: 700;
+      font-size: 0.94rem;
+      background: var(--text-main);
+      color: white;
+      transition: all 0.2s ease;
+      box-shadow: 0 2px 8px rgba(15, 23, 42, 0.15);
+    }
+
+    .btn-launch:hover {
+      background: var(--card-color, var(--primary));
+      transform: translateY(-1px);
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
+    }
+
+    .btn-launch svg {
+      transition: transform 0.2s ease;
+    }
+
+    .btn-launch:hover svg {
+      transform: translateX(3px);
+    }
+
+    /* Purpose Guide Section (Diagnosis) */
+    .guide-section {
+      background: white;
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-lg);
+      padding: 40px 32px;
+      box-shadow: var(--shadow-md);
+      margin-bottom: 60px;
+    }
+
+    .guide-header {
+      text-align: center;
+      margin-bottom: 30px;
+    }
+
+    .guide-title {
+      font-size: 1.45rem;
+      font-weight: 800;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .guide-desc {
+      font-size: 0.92rem;
+      color: var(--text-muted);
+    }
+
+    .guide-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9rem;
+    }
+
+    .guide-table th {
+      background: #f8fafc;
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 700;
+      color: var(--text-sub);
+      border-bottom: 2px solid var(--border-color);
+    }
+
+    .guide-table td {
+      padding: 16px;
+      border-bottom: 1px solid var(--border-color);
+      vertical-align: middle;
+    }
+
+    .guide-table tr:hover td {
+      background: #f8fafc;
+    }
+
+    .guide-table tr:last-child td {
+      border-bottom: none;
+    }
+
+    .tool-link-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 700;
+      color: var(--primary);
+      background: #eff6ff;
+      padding: 7px 14px;
+      border-radius: var(--radius-pill);
+      border: 1px solid #bfdbfe;
+      transition: all 0.2s;
+    }
+
+    .tool-link-badge:hover {
+      background: var(--primary);
+      color: white;
+    }
+
+    /* Security Note Box */
+    .security-box {
+      background: linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%);
+      border: 1px solid #a7f3d0;
+      border-radius: var(--radius-lg);
+      padding: 30px 32px;
+      display: flex;
+      gap: 20px;
+      align-items: flex-start;
+      margin-bottom: 60px;
+    }
+
+    .security-icon {
+      width: 48px;
+      height: 48px;
+      background: #10b981;
+      color: white;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      box-shadow: 0 4px 12px rgba(16, 185, 129, 0.25);
+    }
+
+    .security-content h3 {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: #065f46;
+      margin-bottom: 6px;
+    }
+
+    .security-content p {
+      font-size: 0.88rem;
+      color: #047857;
+      line-height: 1.6;
+    }
+
+    /* Footer */
+    .site-footer {
+      border-top: 1px solid var(--border-color);
+      padding: 36px 0;
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 0.85rem;
+    }
+
+    .footer-links {
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 20px;
+      margin-bottom: 12px;
+    }
+
+    .footer-links a:hover {
+      color: var(--primary);
+      text-decoration: underline;
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      .tools-grid {
+        grid-template-columns: 1fr;
+      }
+      .features-row {
+        grid-template-columns: 1fr;
+      }
+      .security-box {
+        flex-direction: column;
+      }
+      .guide-table th:nth-child(2),
+      .guide-table td:nth-child(2) {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Site Header -->
+  <header class="site-header">
+    <div class="container header-inner">
+      <div class="brand">
+        <div class="brand-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>
+        </div>
+        <span>Data Analytics Tools Portal</span>
+      </div>
+      <div class="header-meta">
+        <span class="badge-secure">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          完全ローカル・セキュア処理
+        </span>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+
+    <!-- Hero Section -->
+    <section class="hero">
+      <div class="hero-badge">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+        インストール不要・ブラウザ完結型データ分析スイート
+      </div>
+      <h1 class="hero-title">直感的に使えるデータ分析・可視化Webツール</h1>
+      <p class="hero-desc">
+        Excelセル範囲のコピペやCSVドラッグ＆ドロップだけで即座に統計・多変量・時系列・テキスト・地図分析を実行。すべての処理はお手元のブラウザ内で安全に行われ、機密データも安心して分析できます。
+      </p>
+
+      <!-- 3つの大きな柱 -->
+      <div class="features-row">
+        <div class="feature-item">
+          <div class="feature-icon-wrapper" style="background:#f0fdf4; color:#16a34a;">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          </div>
+          <div>
+            <div class="feature-title">安心の完全ローカル処理</div>
+            <div class="feature-text">データは外部サーバーへ一切送信されず、お使いのPC内で安全に完結。</div>
+          </div>
+        </div>
+
+        <div class="feature-item">
+          <div class="feature-icon-wrapper" style="background:#eff6ff; color:#2563eb;">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>
+          </div>
+          <div>
+            <div class="feature-title">Excelコピペで即時分析</div>
+            <div class="feature-text">表をコピー（Ctrl+C）して貼り付けるだけ。専用ソフトの導入は不要です。</div>
+          </div>
+        </div>
+
+        <div class="feature-item">
+          <div class="feature-icon-wrapper" style="background:#fdf4ff; color:#a855f7;">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          </div>
+          <div>
+            <div class="feature-title">高精細エクスポート</div>
+            <div class="feature-text">報告書やスライドにそのまま使える高解像度PNG保存＆クリップボード直貼り。</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Purpose Filter Tabs -->
+    <div class="filter-section">
+      <span class="filter-label">分析目的からツールを探す</span>
+      <div class="filter-tabs" id="filter-tabs">
+        <button class="filter-btn active" data-filter="all">すべて表示 (5)</button>
+        <button class="filter-btn" data-filter="geo">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/><line x1="9" y1="3" x2="9" y2="18"/><line x1="15" y1="6" x2="15" y2="21"/></svg>
+          地図・地域統計
+        </button>
+        <button class="filter-btn" data-filter="multivariate">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="12" r="3"/><line x1="9" y1="6" x2="15" y2="12"/><line x1="9" y1="18" x2="15" y2="12"/></svg>
+          多変量・分類
+        </button>
+        <button class="filter-btn" data-filter="text">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg>
+          テキスト分析
+        </button>
+        <button class="filter-btn" data-filter="timeseries">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>
+          時系列・トレンド
+        </button>
+      </div>
+    </div>
+
+    <!-- Tools Grid (5 Tools) -->
+    <div class="tools-grid" id="tools-grid">
+
+      <!-- 1. 青森県市町村コロプレスツール -->
+      <div class="tool-card" data-category="geo" style="--card-color: #0d9488; --card-gradient: linear-gradient(90deg, #0d9488, #14b8a6);">
+        <div class="card-top">
+          <div class="tool-icon-box" style="background: linear-gradient(135deg, #0d9488, #14b8a6);">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/><line x1="9" y1="3" x2="9" y2="18"/><line x1="15" y1="6" x2="15" y2="21"/></svg>
+          </div>
+          <span class="tool-badge" style="background: #f0fdfa; color: #0d9488; border: 1px solid #ccfbf1;">地図・地域統計</span>
+        </div>
+
+        <h2 class="tool-title">青森県市町村コロプレスツール</h2>
+        <p class="tool-desc">
+          県内全40市町村の統計データから、美しい色分け地図（コロプレスマップ）や面積バイアスを完全解消するバブル塗り分け図をワンクリックで作成。ヒストグラムや箱ひげ図とも自動連動します。
+        </p>
+
+        <div class="tool-features">
+          <div class="feature-list-title">主な機能・特長</div>
+          <div class="tag-container">
+            <span class="feature-tag">コロプレスマップ</span>
+            <span class="feature-tag">重なり回避バブル図</span>
+            <span class="feature-tag">段階シンボル図</span>
+            <span class="feature-tag">Jenks自然分類</span>
+            <span class="feature-tag">マップ内箱ひげ図</span>
+            <span class="feature-tag">白黒印刷ハッチング</span>
+            <span class="feature-tag">統計年鑑100指標収録</span>
+          </div>
+        </div>
+
+        <div class="card-footer">
+          <a href="https://satoshi-ohwada.github.io/choropleth-tool/" target="_blank" rel="noopener noreferrer" class="btn-launch">
+            <span>ツールを開く</span>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+          </a>
+        </div>
+      </div>
+
+      <!-- 2. 簡易クラスター分析ツール -->
+      <div class="tool-card" data-category="multivariate" style="--card-color: #4f46e5; --card-gradient: linear-gradient(90deg, #4f46e5, #818cf8);">
+        <div class="card-top">
+          <div class="tool-icon-box" style="background: linear-gradient(135deg, #4f46e5, #6366f1);">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="12" r="3"/><line x1="9" y1="6" x2="15" y2="12"/><line x1="9" y1="18" x2="15" y2="12"/></svg>
+          </div>
+          <span class="tool-badge" style="background: #eef2ff; color: #4f46e5; border: 1px solid #e0e7ff;">多変量・分類</span>
+        </div>
+
+        <h2 class="tool-title">簡易クラスター分析ツール</h2>
+        <p class="tool-desc">
+          Excelデータを取り込むだけで、似た特徴を持つサンプルや自治体・顧客を自動でグループ分け。樹形図（デンドログラム）やUMAPによる高次元データの直感的な2次元散布図を可視化します。
+        </p>
+
+        <div class="tool-features">
+          <div class="feature-list-title">主な機能・特長</div>
+          <div class="tag-container">
+            <span class="feature-tag">階層的クラスタリング</span>
+            <span class="feature-tag">ウォード法 / 最長距離法</span>
+            <span class="feature-tag">デンドログラム（樹形図）</span>
+            <span class="feature-tag">UMAP次元削減可視化</span>
+            <span class="feature-tag">クラスタ別平均プロファイル</span>
+            <span class="feature-tag">グループ列付きCSV出力</span>
+          </div>
+        </div>
+
+        <div class="card-footer">
+          <a href="https://satoshi-ohwada.github.io/cluster-tool/" target="_blank" rel="noopener noreferrer" class="btn-launch">
+            <span>ツールを開く</span>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+          </a>
+        </div>
+      </div>
+
+      <!-- 3. 簡易主成分分析（PCA）ツール -->
+      <div class="tool-card" data-category="multivariate" style="--card-color: #d97706; --card-gradient: linear-gradient(90deg, #d97706, #fbbf24);">
+        <div class="card-top">
+          <div class="tool-icon-box" style="background: linear-gradient(135deg, #d97706, #f59e0b);">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="20" x2="20" y2="4"/><line x1="14" y1="4" x2="20" y2="4"/><line x1="20" y1="10" x2="20" y2="4"/><circle cx="8" cy="12" r="2"/><circle cx="16" cy="16" r="2"/><circle cx="12" cy="8" r="2"/></svg>
+          </div>
+          <span class="tool-badge" style="background: #fffbeb; color: #b45309; border: 1px solid #fef3c7;">多変量・要約</span>
+        </div>
+
+        <h2 class="tool-title">簡易主成分分析（PCA）ツール</h2>
+        <p class="tool-desc">
+          多数の指標（変数）が持つ複雑な情報を、第1主成分・第2主成分などの総合指標へ集約。サンプルのポジショニングマップや、変数の相関を示すバイプロット（因子負荷量）でデータの本質を解明します。
+        </p>
+
+        <div class="tool-features">
+          <div class="feature-list-title">主な機能・特長</div>
+          <div class="tag-container">
+            <span class="feature-tag">主成分分析（PCA）</span>
+            <span class="feature-tag">バイプロット（因子負荷量）</span>
+            <span class="feature-tag">寄与率・スクリープロット</span>
+            <span class="feature-tag">主成分得点散布図</span>
+            <span class="feature-tag">標準化（Zスコア）自動処理</span>
+            <span class="feature-tag">分析結果テーブル出力</span>
+          </div>
+        </div>
+
+        <div class="card-footer">
+          <a href="https://satoshi-ohwada.github.io/pca-test/" target="_blank" rel="noopener noreferrer" class="btn-launch">
+            <span>ツールを開く</span>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+          </a>
+        </div>
+      </div>
+
+      <!-- 4. 簡易時系列分析ツール -->
+      <div class="tool-card" data-category="timeseries" style="--card-color: #0284c7; --card-gradient: linear-gradient(90deg, #0284c7, #38bdf8);">
+        <div class="card-top">
+          <div class="tool-icon-box" style="background: linear-gradient(135deg, #0284c7, #0ea5e9);">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>
+          </div>
+          <span class="tool-badge" style="background: #f0f9ff; color: #0284c7; border: 1px solid #bae6fd;">時系列・予測</span>
+        </div>
+
+        <h2 class="tool-title">簡易時系列分析ツール</h2>
+        <p class="tool-desc">
+          売上や来訪者数、月次統計などの時系列データから、Excel単体では難しい「STL分解（長期トレンド・季節変動・不規則成分の分離）」をブラウザ上で実行。周期的な増減パターンを明瞭に把握できます。
+        </p>
+
+        <div class="tool-features">
+          <div class="feature-list-title">主な機能・特長</div>
+          <div class="tag-container">
+            <span class="feature-tag">STL分解（季節・トレンド分離）</span>
+            <span class="feature-tag">移動平均（平滑化）</span>
+            <span class="feature-tag">季節変動指数の自動抽出</span>
+            <span class="feature-tag">月次 / 四半期 / 週次対応</span>
+            <span class="feature-tag">成分別グラフ同時描画</span>
+            <span class="feature-tag">分解後時系列データCSV出力</span>
+          </div>
+        </div>
+
+        <div class="card-footer">
+          <a href="https://satoshi-ohwada.github.io/time-series-tool/" target="_blank" rel="noopener noreferrer" class="btn-launch">
+            <span>ツールを開く</span>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+          </a>
+        </div>
+      </div>
+
+      <!-- 5. 簡易テキスト分析ツール -->
+      <div class="tool-card" data-category="text" style="--card-color: #e11d48; --card-gradient: linear-gradient(90deg, #e11d48, #fb7185);">
+        <div class="card-top">
+          <div class="tool-icon-box" style="background: linear-gradient(135deg, #e11d48, #f43f5e);">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg>
+          </div>
+          <span class="tool-badge" style="background: #fff1f2; color: #e11d48; border: 1px solid #fecdd3;">テキスト分析</span>
+        </div>
+
+        <h2 class="tool-title">簡易テキスト分析ツール</h2>
+        <p class="tool-desc">
+          アンケート自由記述、クチコミ、議事録などのテキストを形態素解析エンジン（kuromoji.js）で高速分解。言葉の出現頻度ランキングや美しいワードクラウド、語と語の繋がりを示す共起ネットワークを描画します。
+        </p>
+
+        <div class="tool-features">
+          <div class="feature-list-title">主な機能・特長</div>
+          <div class="tag-container">
+            <span class="feature-tag">日本語形態素解析 (kuromoji)</span>
+            <span class="feature-tag">ワードクラウド生成</span>
+            <span class="feature-tag">頻出語・品詞別ランキング</span>
+            <span class="feature-tag">共起ネットワーク図</span>
+            <span class="feature-tag">ストップワード（除外語）設定</span>
+            <span class="feature-tag">文章の直接貼り付け対応</span>
+          </div>
+        </div>
+
+        <div class="card-footer">
+          <a href="https://satoshi-ohwada.github.io/text-analysis-test/" target="_blank" rel="noopener noreferrer" class="btn-launch">
+            <span>ツールを開く</span>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+          </a>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Purpose Diagnosis Guide -->
+    <section class="guide-section">
+      <div class="guide-header">
+        <h2 class="guide-title">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m4.93 4.93 4.24 4.24"/><path d="m14.83 9.17 4.24-4.24"/><path d="m14.83 14.83 4.24 4.24"/><path d="m9.17 14.83-4.24 4.24"/><circle cx="12" cy="12" r="4"/></svg>
+          あなたの課題にぴったりのツール早見表
+        </h2>
+        <p class="guide-desc">「手元のデータをどう分析すればよいかわからない」という時は、こちらの対応表を参考にしてください。</p>
+      </div>
+
+      <table class="guide-table">
+        <thead>
+          <tr>
+            <th style="width: 32%;">やりたいこと・目的</th>
+            <th style="width: 38%;">分析手法・得られる知見</th>
+            <th style="width: 30%;">おすすめのツール</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>地域の格差や偏りを地図上で見せたい</strong></td>
+            <td>市町村ごとの数値に応じた色分けやバブル描画により、地理的な集積や傾向を直感的に伝達。</td>
+            <td>
+              <a href="https://satoshi-ohwada.github.io/choropleth-tool/" target="_blank" class="tool-link-badge">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/><line x1="9" y1="3" x2="9" y2="18"/><line x1="15" y1="6" x2="15" y2="21"/></svg>
+                青森県市町村コロプレス
+              </a>
+            </td>
+          </tr>
+          <tr>
+            <td><strong>顧客や自治体を似たタイプごとに分類したい</strong></td>
+            <td>多変量データの距離を計算し、自動でグループ分け。樹形図や散布図で構造を把握。</td>
+            <td>
+              <a href="https://satoshi-ohwada.github.io/cluster-tool/" target="_blank" class="tool-link-badge">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="12" r="3"/><line x1="9" y1="6" x2="15" y2="12"/><line x1="9" y1="18" x2="15" y2="12"/></svg>
+                簡易クラスター分析
+              </a>
+            </td>
+          </tr>
+          <tr>
+            <td><strong>たくさんの指標を総合してランキングや強みを比べたい</strong></td>
+            <td>多変量を第1・第2主成分に要約し、ポジショニングマップや要因ベクトルで比較。</td>
+            <td>
+              <a href="https://satoshi-ohwada.github.io/pca-test/" target="_blank" class="tool-link-badge">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="20" x2="20" y2="4"/><line x1="14" y1="4" x2="20" y2="4"/><line x1="20" y1="10" x2="20" y2="4"/><circle cx="8" cy="12" r="2"/><circle cx="16" cy="16" r="2"/><circle cx="12" cy="8" r="2"/></svg>
+                簡易主成分分析（PCA）
+              </a>
+            </td>
+          </tr>
+          <tr>
+            <td><strong>売上や来訪者の季節変動や長期トレンドを分解したい</strong></td>
+            <td>時系列データから長期傾向と周期的な季節要因を分離し、本来の増減トレンドを可視化。</td>
+            <td>
+              <a href="https://satoshi-ohwada.github.io/time-series-tool/" target="_blank" class="tool-link-badge">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>
+                簡易時系列分析
+              </a>
+            </td>
+          </tr>
+          <tr>
+            <td><strong>アンケートの自由回答やクチコミの要点を掴みたい</strong></td>
+            <td>日本語文章を単語に分解し、頻出キーワードや言葉同士のつながりを視覚的に分析。</td>
+            <td>
+              <a href="https://satoshi-ohwada.github.io/text-analysis-test/" target="_blank" class="tool-link-badge">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg>
+                簡易テキスト分析
+              </a>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- Security & Privacy Assurance -->
+    <section class="security-box">
+      <div class="security-icon">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+      </div>
+      <div class="security-content">
+        <h3>業務データ・独自調査でも安心な「完全ローカル処理」</h3>
+        <p>
+          本ポータルに掲載されているすべてのツールは、読み込んだデータや入力された文章を<strong>外部サーバーへ送信・保存することは一切ありません</strong>。すべての計算・解析はお使いのPC（Webブラウザ内）で安全に行われます。自治体・官公庁の内部データや企業の機密情報、個人情報を含むアンケート回答なども安心してご利用いただけます。
+        </p>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-links">
+        <a href="https://satoshi-ohwada.github.io/choropleth-tool/" target="_blank">コロプレスツール</a>
+        <a href="https://satoshi-ohwada.github.io/cluster-tool/" target="_blank">クラスター分析</a>
+        <a href="https://satoshi-ohwada.github.io/pca-test/" target="_blank">主成分分析 (PCA)</a>
+        <a href="https://satoshi-ohwada.github.io/time-series-tool/" target="_blank">時系列分析</a>
+        <a href="https://satoshi-ohwada.github.io/text-analysis-test/" target="_blank">テキスト分析</a>
+      </div>
+      <p>&copy; 2026 Satoshi Ohwada. All rights reserved. ブラウザ完結型データ分析ツールスイート</p>
+    </div>
+  </footer>
+
+  <script>
+    // Category Filter Functionality
+    document.addEventListener("DOMContentLoaded", () => {
+      const filterBtns = document.querySelectorAll(".filter-btn");
+      const toolCards = document.querySelectorAll(".tool-card");
+
+      filterBtns.forEach(btn => {
+        btn.addEventListener("click", () => {
+          // Update active button
+          filterBtns.forEach(b => b.classList.remove("active"));
+          btn.classList.add("active");
+
+          const filterValue = btn.getAttribute("data-filter");
+
+          toolCards.forEach(card => {
+            const category = card.getAttribute("data-category");
+            if (filterValue === "all" || category === filterValue) {
+              card.style.display = "flex";
+              // Fade-in animation
+              card.style.opacity = "0";
+              card.style.transform = "translateY(8px)";
+              setTimeout(() => {
+                card.style.transition = "opacity 0.25s ease, transform 0.25s ease";
+                card.style.opacity = "1";
+                card.style.transform = "translateY(0)";
+              }, 30);
+            } else {
+              card.style.display = "none";
+            }
+          });
+        });
+      });
+    });
+  </script>
+</body>
+</html>

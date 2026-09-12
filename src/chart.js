@@ -105,10 +105,14 @@ export function renderChart(
     }
   };
 
+  const firstTimestamp = timestamps && timestamps.length > 0 ? timestamps[0] : undefined;
+  const lastTimestamp = timestamps && timestamps.length > 0 ? timestamps[timestamps.length - 1] : undefined;
+
   const commonXAxis = {
     gridcolor: palette.grid,
     zerolinecolor: palette.grid,
-    tickfont: { color: palette.subtext }
+    tickfont: { color: palette.subtext },
+    ...(firstTimestamp && lastTimestamp ? { range: [firstTimestamp, lastTimestamp] } : {})
   };
 
   const commonYAxis = {
@@ -224,10 +228,7 @@ export function renderChart(
           width: 1.5
         }
       },
-      hoverinfo: 'text',
-      hovertext: changePoints.map(cp => 
-        `<b>📍 ${cp.label}</b><br>日時: ${cp.timestamp}<br>トレンド値: ${cp.value.toLocaleString(undefined, { maximumFractionDigits: 2 })}<br>${cp.description}`
-      ),
+      hoverinfo: 'skip',
       xaxis: xRef,
       yaxis: yRef
     };
@@ -311,11 +312,13 @@ export function renderChart(
     if (showCusumAlerts && cusumResult.anomalies) {
       for (const anom of cusumResult.anomalies) {
         const isPos = anom.type === 'positive';
+        const isNearRight = timestamps.indexOf(anom.startTime) > timestamps.length * 0.85;
         cusumAnnotations.push({
           x: anom.startTime,
           y: isPos ? h : -h,
           xref: 'x',
           yref: 'y',
+          xanchor: isNearRight ? 'right' : 'left',
           text: `⚠️ ${anom.label}`,
           showarrow: true,
           arrowhead: 2,
@@ -373,7 +376,7 @@ export function renderChart(
         mode: 'lines',
         name: 'トレンド (Trend)',
         line: { color: palette.trend, width: 2.5 },
-        xaxis: 'x2',
+        xaxis: 'x',
         yaxis: 'y2'
       },
       {
@@ -383,7 +386,7 @@ export function renderChart(
         mode: 'lines',
         name: '周期変動 (Seasonal)',
         line: { color: palette.seasonal, width: 2 },
-        xaxis: 'x3',
+        xaxis: 'x',
         yaxis: 'y3'
       },
       {
@@ -393,13 +396,13 @@ export function renderChart(
         mode: 'lines',
         name: '残差 (Residual)',
         line: { color: palette.residual, width: 1.5 },
-        xaxis: 'x4',
+        xaxis: 'x',
         yaxis: 'y4'
       }
     ];
 
     // Add Change Point trace to Trend subplot (y2)
-    const cpTrace = buildChangePointTrace('x2', 'y2');
+    const cpTrace = buildChangePointTrace('x', 'y2');
     if (cpTrace) {
       traces.push(cpTrace);
     }
@@ -408,16 +411,16 @@ export function renderChart(
 
     // Trend change point vertical lines on y2
     if (showChangePoints && changePoints.length > 0) {
-      shapes.push(...buildChangePointShapes('y2', Math.min(...trend), Math.max(...trend), 'x2'));
+      shapes.push(...buildChangePointShapes('y2', Math.min(...trend), Math.max(...trend), 'x'));
     }
 
     // CUSUM alert shades and point markers on Residual subplot (y4)
     if (showCusumAlerts && cusumResult && cusumResult.anomalies) {
       const resMin = Math.min(...residual);
       const resMax = Math.max(...residual);
-      shapes.push(...buildCusumShades('y4', resMin, resMax, 'x4'));
+      shapes.push(...buildCusumShades('y4', resMin, resMax, 'x'));
 
-      // Highlight individual alarm points on y4
+      // Highlight individual alarm points on y4 (skip hoverinfo so unified hover is preserved)
       const alertX = [];
       const alertY = [];
       for (let i = 0; i < residual.length; i++) {
@@ -438,9 +441,8 @@ export function renderChart(
             color: palette.cusumLimit,
             symbol: 'circle'
           },
-          hoverinfo: 'text',
-          hovertext: alertX.map((t, idx) => `⚠️ CUSUM異常点<br>日時: ${t}<br>残差: ${alertY[idx].toFixed(2)}`),
-          xaxis: 'x4',
+          hoverinfo: 'skip',
+          xaxis: 'x',
           yaxis: 'y4'
         });
       }
@@ -456,17 +458,38 @@ export function renderChart(
         y: 0.98,
         yanchor: 'top'
       },
-      grid: { rows: 4, columns: 1, sharex: true },
       showlegend: false,
       margin: { t: 65, r: 30, l: 65, b: 65 },
-      xaxis: { ...commonXAxis, anchor: 'y', showticklabels: false },
-      yaxis: { ...commonYAxis, title: { text: 'Observed', font: { color: palette.subtext } } },
-      xaxis2: { ...commonXAxis, anchor: 'y2', showticklabels: false },
-      yaxis2: { ...commonYAxis, title: { text: 'Trend', font: { color: palette.subtext } } },
-      xaxis3: { ...commonXAxis, anchor: 'y3', showticklabels: false },
-      yaxis3: { ...commonYAxis, title: { text: 'Seasonal', font: { color: palette.subtext } } },
-      xaxis4: { ...commonXAxis, anchor: 'y4', showticklabels: true },
-      yaxis4: { ...commonYAxis, title: { text: 'Residual', font: { color: palette.subtext } } },
+      xaxis: {
+        ...commonXAxis,
+        anchor: 'y4',
+        showticklabels: true,
+        title: { text: '年月', font: { color: palette.subtext } },
+        spikemode: 'across',
+        spikethickness: 1,
+        spikecolor: palette.grid,
+        spikedash: 'dot'
+      },
+      yaxis: {
+        ...commonYAxis,
+        domain: [0.78, 1.0],
+        title: { text: 'Observed', font: { color: palette.subtext } }
+      },
+      yaxis2: {
+        ...commonYAxis,
+        domain: [0.52, 0.74],
+        title: { text: 'Trend', font: { color: palette.subtext } }
+      },
+      yaxis3: {
+        ...commonYAxis,
+        domain: [0.26, 0.48],
+        title: { text: 'Seasonal', font: { color: palette.subtext } }
+      },
+      yaxis4: {
+        ...commonYAxis,
+        domain: [0.0, 0.22],
+        title: { text: 'Residual', font: { color: palette.subtext } }
+      },
       shapes: shapes
     };
 
@@ -512,11 +535,13 @@ export function renderChart(
     if (showCusumAlerts && cusumResult && cusumResult.hasAnomaly) {
       shapes.push(...buildCusumShades());
       for (const anom of cusumResult.anomalies) {
+        const isNearRight = timestamps.indexOf(anom.startTime) > timestamps.length * 0.85;
         annotations.push({
           x: anom.startTime,
           y: 1,
           xref: 'x',
           yref: 'paper',
+          xanchor: isNearRight ? 'right' : 'left',
           text: `⚠️ CUSUM異常`,
           showarrow: false,
           font: { color: palette.cusumLimit, size: 10, weight: 600 },
@@ -614,8 +639,7 @@ export function renderChart(
             color: palette.cusumLimit,
             symbol: 'circle'
           },
-          hoverinfo: 'text',
-          hovertext: alertX.map((t, idx) => `⚠️ CUSUM異常点<br>日時: ${t}<br>残差: ${alertY[idx].toFixed(2)}`)
+          hoverinfo: 'skip'
         });
       }
     }

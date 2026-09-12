@@ -1,14 +1,14 @@
 /**
  * Main application integration logic
  */
-import { parsePastedText, parseFileBuffer, decodeCsvBuffer, detectColumns, extractTimeSeries, detectPeriodicity, interpolateMissingSeries } from './parser.js';
-import { stlDecompose } from './stl.js';
-import { detectTrendChangePoints } from './changePoint.js';
-import { calculateResidualCusum } from './cusum.js';
-import { renderChart, downloadChartImage } from './chart.js';
-import { exportSingleVariableCSV, exportAllVariablesCSV } from './exporter.js';
-import { renderTableEditor } from './tableEditor.js';
-import { renderResultTable } from './resultTable.js';
+import { parsePastedText, parseFileBuffer, decodeCsvBuffer, detectColumns, extractTimeSeries, detectPeriodicity, interpolateMissingSeries } from './parser.js?v=20';
+import { stlDecompose } from './stl.js?v=20';
+import { detectTrendChangePoints } from './changePoint.js?v=20';
+import { calculateResidualCusum } from './cusum.js?v=20';
+import { renderChart, downloadChartImage } from './chart.js?v=20';
+import { exportSingleVariableCSV, exportAllVariablesCSV } from './exporter.js?v=20';
+import { renderTableEditor } from './tableEditor.js?v=20';
+import { renderResultTable } from './resultTable.js?v=20';
 
 const state = {
   rawRows: [],
@@ -20,6 +20,7 @@ const state = {
   seasonalMode: 'periodic', // 'periodic' | 'flexible'
   viewMode: 'overlay',
   mainMode: 'graph', // 'graph' | 'result' | 'table'
+  resultTableDirty: true,
   customTitle: '',
   bgMode: 'dark', // 'dark' | 'white' | 'transparent'
   enableInterpolation: true,
@@ -151,6 +152,9 @@ function initEventListeners() {
     if (!state.decompositions[state.selectedVar]) {
       runDecompositionForSelectedVar();
     } else {
+      if (state.decompositions[state.selectedVar]?.timestamps) {
+        state.timestamps = state.decompositions[state.selectedVar].timestamps;
+      }
       updateChartDisplay();
       updateResultTableDisplay();
       updateSummaryStats();
@@ -158,16 +162,33 @@ function initEventListeners() {
   });
 
   // Period Settings & Auto Detect
-  periodInput.addEventListener('change', (e) => {
-    state.period = Math.max(2, parseInt(e.target.value) || 12);
+  let periodDebounceTimer = null;
+  const triggerPeriodChange = (newPeriod) => {
+    state.period = Math.max(2, newPeriod);
     periodInput.value = state.period;
     runDecompositionForAllVars();
+  };
+
+  periodInput.addEventListener('input', (e) => {
+    clearTimeout(periodDebounceTimer);
+    periodDebounceTimer = setTimeout(() => {
+      const val = parseInt(e.target.value);
+      if (!isNaN(val) && val >= 2) {
+        triggerPeriodChange(val);
+      }
+    }, 250);
   });
+
+  periodInput.addEventListener('change', (e) => {
+    clearTimeout(periodDebounceTimer);
+    const val = parseInt(e.target.value) || 12;
+    triggerPeriodChange(val);
+  });
+
   periodPresetSelect.addEventListener('change', (e) => {
     if (e.target.value) {
-      state.period = Math.max(2, parseInt(e.target.value));
-      periodInput.value = state.period;
-      runDecompositionForAllVars();
+      clearTimeout(periodDebounceTimer);
+      triggerPeriodChange(parseInt(e.target.value));
     }
   });
 
@@ -339,7 +360,9 @@ function switchMainMode(mode) {
   } else if (mode === 'result') {
     showResultModeBtn.classList.add('active');
     resultTableContainer.classList.remove('hidden');
-    updateResultTableDisplay();
+    if (state.resultTableDirty) {
+      updateResultTableDisplay(true);
+    }
   } else if (mode === 'table') {
     showTableModeBtn.classList.add('active');
     tableEditorContainer.classList.remove('hidden');
@@ -419,11 +442,47 @@ function populateSelects() {
   });
 }
 
+// On-demand decomposition for single variable with caching
+export function runDecompositionForVar(varName) {
+  if (!varName || !state.rawRows.length) return null;
+  if (state.decompositions[varName]) {
+    return state.decompositions[varName];
+  }
+
+  const { timestamps: rawT, values: rawV } = extractTimeSeries(state.rawRows, state.timeCol, varName);
+  const { timestamps: interpT, values: interpV, interpolatedCount } = interpolateMissingSeries(rawT, rawV, state.enableInterpolation);
+
+  if (interpV.length === 0) return null;
+
+  const result = getBestStlDecompose(interpV, {
+    period: state.period,
+    modelMode: state.model,
+    seasonalWindow: state.seasonalMode === 'periodic' ? 'periodic' : 7
+  });
+  result.timestamps = interpT;
+  result.interpolatedCount = interpolatedCount;
+
+  state.decompositions[varName] = result;
+  runAnalyticsForVar(varName);
+
+  return result;
+}
+
+export function ensureAllDecompositions() {
+  state.valueCols.forEach(varName => {
+    if (!state.decompositions[varName]) {
+      runDecompositionForVar(varName);
+    }
+  });
+  return state.decompositions;
+}
+
 function runDecompositionForAllVars() {
+  // Clear caches when model, period or dataset changes
   state.decompositions = {};
   state.analytics = {};
 
-  if (!state.rawRows || state.rawRows.length === 0 || !state.valueCols.length || !state.timeCol) {
+  if (!state.valueCols.length || !state.rawRows.length) {
     state.timestamps = [];
     interpolationNotice.classList.add('hidden');
     updateChartDisplay();
@@ -432,49 +491,27 @@ function runDecompositionForAllVars() {
     return;
   }
 
-  // Extract raw time-series for target column 1 to interpolate timestamps
-  const rawExtract = extractTimeSeries(state.rawRows, state.timeCol, state.valueCols[0]);
-  const interpolatedBase = interpolateMissingSeries(rawExtract.timestamps, rawExtract.values, state.enableInterpolation);
-  state.timestamps = interpolatedBase.timestamps;
-
-  if (interpolatedBase.interpolatedCount > 0) {
-    interpolationNotice.textContent = `※ ${interpolatedBase.interpolatedCount} 件の欠損日時を線形補間しました`;
-    interpolationNotice.classList.remove('hidden');
-  } else {
-    interpolationNotice.classList.add('hidden');
+  if (!state.selectedVar || !state.valueCols.includes(state.selectedVar)) {
+    state.selectedVar = state.valueCols[0];
   }
 
-  state.valueCols.forEach(varName => {
-    const { timestamps: rawT, values: rawV } = extractTimeSeries(state.rawRows, state.timeCol, varName);
-    const { values: interpV } = interpolateMissingSeries(rawT, rawV, state.enableInterpolation);
-
-    if (interpV.length > 0) {
-      const result = getBestStlDecompose(interpV, {
-        period: state.period,
-        modelMode: state.model,
-        seasonalWindow: state.seasonalMode === 'periodic' ? 'periodic' : 7
-      });
-      state.decompositions[varName] = result;
-      runAnalyticsForVar(varName);
-    }
-  });
-
-  updateChartDisplay();
-  updateResultTableDisplay();
-  updateSummaryStats();
+  // Calculate ONLY the selected variable on demand (ultra-fast startup)
+  runDecompositionForSelectedVar();
 }
 
 function runAnalyticsForVar(varName) {
   const res = state.decompositions[varName];
-  if (!res || !state.timestamps.length) return;
+  if (!res) return;
+  const timestamps = res.timestamps || state.timestamps;
+  if (!timestamps || !timestamps.length) return;
 
-  const changePoints = detectTrendChangePoints(state.timestamps, res.trend, {
+  const changePoints = detectTrendChangePoints(timestamps, res.trend, {
     period: state.period,
     sensitivity: state.cpSensitivity
   });
 
   const isMultiplicative = res._autoDetected === 'multiplicative' || state.model === 'multiplicative';
-  const cusumResult = calculateResidualCusum(state.timestamps, res.residual, {
+  const cusumResult = calculateResidualCusum(timestamps, res.residual, {
     sensitivity: state.cusumSensitivity,
     multiplicative: isMultiplicative
   });
@@ -552,25 +589,16 @@ function getBestStlDecompose(values, options) {
 function runDecompositionForSelectedVar() {
   if (!state.selectedVar || !state.rawRows.length) return;
 
-  const { timestamps: rawT, values: rawV } = extractTimeSeries(state.rawRows, state.timeCol, state.selectedVar);
-  const { timestamps, values, interpolatedCount } = interpolateMissingSeries(rawT, rawV, state.enableInterpolation);
-  state.timestamps = timestamps;
-
-  if (interpolatedCount > 0) {
-    interpolationNotice.textContent = `※ ${interpolatedCount} 件の欠損日時を線形補間しました`;
-    interpolationNotice.classList.remove('hidden');
-  } else {
-    interpolationNotice.classList.add('hidden');
+  const result = runDecompositionForVar(state.selectedVar);
+  if (result) {
+    state.timestamps = result.timestamps;
+    if (result.interpolatedCount > 0) {
+      interpolationNotice.textContent = `※ ${result.interpolatedCount} 件の欠損日時を線形補間しました`;
+      interpolationNotice.classList.remove('hidden');
+    } else {
+      interpolationNotice.classList.add('hidden');
+    }
   }
-
-  const result = getBestStlDecompose(values, {
-    period: state.period,
-    modelMode: state.model,
-    seasonalWindow: state.seasonalMode === 'periodic' ? 'periodic' : 7
-  });
-
-  state.decompositions[state.selectedVar] = result;
-  runAnalyticsForVar(state.selectedVar);
 
   updateChartDisplay();
   updateResultTableDisplay();
@@ -580,7 +608,9 @@ function runDecompositionForSelectedVar() {
 function updateChartDisplay() {
   const currentResult = state.decompositions[state.selectedVar];
   const container = document.getElementById('chartContainer');
-  if (!currentResult || !state.timestamps.length) {
+  const timestamps = currentResult?.timestamps || state.timestamps;
+
+  if (!currentResult || !timestamps || !timestamps.length) {
     if (container) {
       if (window.Plotly) {
         try { Plotly.purge(container); } catch (e) {}
@@ -597,9 +627,18 @@ function updateChartDisplay() {
 
   const currentAnalytics = state.analytics[state.selectedVar] || { changePoints: [], cusumResult: null };
 
+  const chartWrapper = document.getElementById('chartWrapper');
+  if (chartWrapper) {
+    if (state.viewMode === 'decomposition') {
+      chartWrapper.classList.add('mode-decomposition');
+    } else {
+      chartWrapper.classList.remove('mode-decomposition');
+    }
+  }
+
   renderChart(
     'chartContainer',
-    state.timestamps,
+    timestamps,
     currentResult,
     state.viewMode,
     state.selectedVar,
@@ -614,16 +653,23 @@ function updateChartDisplay() {
   );
 }
 
-function updateResultTableDisplay() {
+function updateResultTableDisplay(force = false) {
+  if (!force && state.mainMode !== 'result') {
+    state.resultTableDirty = true;
+    return;
+  }
+  state.resultTableDirty = false;
   const res = state.decompositions[state.selectedVar];
   const currentAnalytics = state.analytics[state.selectedVar] || {};
+  const timestamps = res?.timestamps || state.timestamps;
   renderResultTable(
     'resultTableContainer',
-    state.timestamps,
+    timestamps,
     res,
     state.selectedVar,
-    state.decompositions,
-    currentAnalytics
+    ensureAllDecompositions,
+    currentAnalytics,
+    state.valueCols.length > 1
   );
 }
 

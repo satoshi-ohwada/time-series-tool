@@ -80,18 +80,37 @@ export function exportAllVariablesCSV(timestamps, allDecompositions) {
   });
   const rows = [headerCols.join(',')];
 
+  // Pre-build index maps for variables with their own timestamps
+  const varIndexMaps = new Map();
+  varNames.forEach(varName => {
+    const res = allDecompositions[varName];
+    if (res && res.timestamps && Array.isArray(res.timestamps)) {
+      const map = new Map();
+      res.timestamps.forEach((t, idx) => map.set(t, idx));
+      varIndexMaps.set(varName, map);
+    }
+  });
+
   for (let i = 0; i < timestamps.length; i++) {
-    const rowCols = [formatCSVField(timestamps[i])];
+    const tStr = timestamps[i];
+    const rowCols = [formatCSVField(tStr)];
     varNames.forEach(varName => {
       const res = allDecompositions[varName];
-      const adj = res.adjusted ? res.adjusted[i] : (res.observed[i] !== undefined && res.seasonal[i] !== undefined ? res.observed[i] - res.seasonal[i] : '');
-      rowCols.push(
-        res.observed[i] !== undefined ? res.observed[i] : '',
-        res.trend[i] !== undefined ? res.trend[i] : '',
-        res.seasonal[i] !== undefined ? res.seasonal[i] : '',
-        adj !== undefined ? adj : '',
-        res.residual[i] !== undefined ? res.residual[i] : ''
-      );
+      const idxMap = varIndexMaps.get(varName);
+      const idx = idxMap ? idxMap.get(tStr) : i;
+
+      if (idx !== undefined && res && res.observed && res.observed[idx] !== undefined) {
+        const adj = res.adjusted ? res.adjusted[idx] : (res.observed[idx] !== undefined && res.seasonal[idx] !== undefined ? res.observed[idx] - res.seasonal[idx] : '');
+        rowCols.push(
+          res.observed[idx] !== undefined ? res.observed[idx] : '',
+          res.trend[idx] !== undefined ? res.trend[idx] : '',
+          res.seasonal[idx] !== undefined ? res.seasonal[idx] : '',
+          adj !== undefined ? adj : '',
+          res.residual[idx] !== undefined ? res.residual[idx] : ''
+        );
+      } else {
+        rowCols.push('', '', '', '', '');
+      }
     });
     rows.push(rowCols.join(','));
   }

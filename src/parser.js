@@ -130,10 +130,10 @@ export function detectColumns(rows) {
   const valueCols = [];
   for (const key of keys) {
     if (key === timeCol) continue;
-    // Check if at least half of the non-empty rows are valid numbers
+    // Check if at least half of the non-empty rows are valid numbers (sample up to 100 non-empty values)
     let validCount = 0;
     let totalCount = 0;
-    for (let i = 0; i < Math.min(rows.length, 50); i++) {
+    for (let i = 0; i < rows.length && totalCount < 100; i++) {
       const val = rows[i][key];
       if (val !== '' && val !== null && val !== undefined) {
         totalCount++;
