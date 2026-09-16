@@ -33,8 +33,10 @@ export function exportSingleVariableCSV(timestamps, stlResult, varName, analytic
   const rows = [headerCols.join(',')];
   const { observed, trend, seasonal, residual } = stlResult;
   let adjusted = stlResult.adjusted;
+  const isMultiplicative = !!(stlResult.isMultiplicative || stlResult._autoDetected === 'multiplicative' ||
+    (seasonal && seasonal.length > 0 && Math.abs((seasonal.reduce((a, b) => a + b, 0) / seasonal.length) - 1.0) < 0.3));
   if (!adjusted && observed && seasonal) {
-    adjusted = observed.map((obs, i) => obs - seasonal[i]);
+    adjusted = observed.map((obs, i) => (isMultiplicative && seasonal[i] !== 0 ? obs / seasonal[i] : obs - seasonal[i]));
   }
 
   for (let i = 0; i < timestamps.length; i++) {
@@ -99,8 +101,8 @@ export function exportAllVariablesCSV(timestamps, allDecompositions) {
       const idxMap = varIndexMaps.get(varName);
       const idx = idxMap ? idxMap.get(tStr) : i;
 
-      if (idx !== undefined && res && res.observed && res.observed[idx] !== undefined) {
-        const adj = res.adjusted ? res.adjusted[idx] : (res.observed[idx] !== undefined && res.seasonal[idx] !== undefined ? res.observed[idx] - res.seasonal[idx] : '');
+        const isMul = !!(res.isMultiplicative || res._autoDetected === 'multiplicative');
+        const adj = res.adjusted ? res.adjusted[idx] : (res.observed[idx] !== undefined && res.seasonal[idx] !== undefined ? (isMul && res.seasonal[idx] !== 0 ? res.observed[idx] / res.seasonal[idx] : res.observed[idx] - res.seasonal[idx]) : '');
         rowCols.push(
           res.observed[idx] !== undefined ? res.observed[idx] : '',
           res.trend[idx] !== undefined ? res.trend[idx] : '',

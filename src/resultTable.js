@@ -1,7 +1,7 @@
 /**
  * STL Decomposition Result Table Viewer module
  */
-import { exportSingleVariableCSV, exportAllVariablesCSV } from './exporter.js?v=20';
+import { exportSingleVariableCSV, exportAllVariablesCSV } from './exporter.js?v=23';
 
 /**
  * Render STL decomposition calculation results as an interactive table
@@ -24,8 +24,10 @@ export function renderResultTable(containerId, timestamps, stlResult, varName, a
 
   const { observed, trend, seasonal, residual } = stlResult;
   let adjusted = stlResult.adjusted;
+  const isMultiplicative = !!(stlResult.isMultiplicative || stlResult._autoDetected === 'multiplicative' ||
+    (seasonal && seasonal.length > 0 && Math.abs((seasonal.reduce((a, b) => a + b, 0) / seasonal.length) - 1.0) < 0.3));
   if (!adjusted && observed && seasonal) {
-    adjusted = observed.map((obs, i) => obs - seasonal[i]);
+    adjusted = observed.map((obs, i) => (isMultiplicative && seasonal[i] !== 0 ? obs / seasonal[i] : obs - seasonal[i]));
   }
   const hasMultipleVars = hasMultipleVarsOverride !== null
     ? hasMultipleVarsOverride

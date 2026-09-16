@@ -36,8 +36,10 @@ export function renderChart(
   }
 
   let { observed, trend, seasonal, residual, adjusted } = stlResult;
+  const isMultiplicative = !!(stlResult.isMultiplicative || stlResult._autoDetected === 'multiplicative' ||
+    (seasonal && seasonal.length > 0 && Math.abs((seasonal.reduce((a, b) => a + b, 0) / seasonal.length) - 1.0) < 0.3));
   if (!adjusted && observed && seasonal) {
-    adjusted = observed.map((obs, i) => obs - seasonal[i]);
+    adjusted = observed.map((obs, i) => (isMultiplicative && seasonal[i] !== 0 ? obs / seasonal[i] : obs - seasonal[i]));
   }
 
   const {
@@ -105,14 +107,16 @@ export function renderChart(
     }
   };
 
-  const firstTimestamp = timestamps && timestamps.length > 0 ? timestamps[0] : undefined;
-  const lastTimestamp = timestamps && timestamps.length > 0 ? timestamps[timestamps.length - 1] : undefined;
+  const nPoints = timestamps ? timestamps.length : 0;
 
   const commonXAxis = {
     gridcolor: palette.grid,
     zerolinecolor: palette.grid,
     tickfont: { color: palette.subtext },
-    ...(firstTimestamp && lastTimestamp ? { range: [firstTimestamp, lastTimestamp] } : {})
+    ...(nPoints > 0 ? {
+      range: [-0.5, nPoints - 0.5],
+      autorange: false
+    } : {})
   };
 
   const commonYAxis = {
@@ -206,6 +210,14 @@ export function renderChart(
     if (!showChangePoints || !changePoints || changePoints.length === 0) {
       return null;
     }
+    const totalCount = timestamps.length;
+    const textPositions = changePoints.map(cp => {
+      const idx = timestamps.indexOf(cp.timestamp);
+      if (idx > totalCount * 0.8) return 'top left';
+      if (idx < totalCount * 0.15) return 'top right';
+      return 'top center';
+    });
+
     return {
       x: changePoints.map(cp => cp.timestamp),
       y: changePoints.map(cp => cp.value),
@@ -213,7 +225,8 @@ export function renderChart(
       mode: 'markers+text',
       name: '主要な変化点',
       text: changePoints.map(cp => ` ${cp.label}`),
-      textposition: 'top center',
+      textposition: textPositions,
+      cliponaxis: true,
       textfont: {
         color: palette.changePoint,
         size: 11,
@@ -265,29 +278,32 @@ export function renderChart(
         line: { color: palette.cusumMinus, width: 2.5 }
       },
       {
-        x: [timestamps[0], timestamps[timestamps.length - 1]],
-        y: [h, h],
+        x: timestamps,
+        y: new Array(timestamps.length).fill(h),
         type: 'scatter',
         mode: 'lines',
         name: `管理限界 (+h: ${(h).toFixed(1)})`,
-        line: { color: palette.cusumLimit, width: 2, dash: 'dash' }
+        line: { color: palette.cusumLimit, width: 2, dash: 'dash' },
+        hoverinfo: 'skip'
       },
       {
-        x: [timestamps[0], timestamps[timestamps.length - 1]],
-        y: [-h, -h],
+        x: timestamps,
+        y: new Array(timestamps.length).fill(-h),
         type: 'scatter',
         mode: 'lines',
         name: `管理限界 (-h: ${(-h).toFixed(1)})`,
-        line: { color: palette.cusumLimit, width: 2, dash: 'dash' }
+        line: { color: palette.cusumLimit, width: 2, dash: 'dash' },
+        hoverinfo: 'skip'
       },
       {
-        x: [timestamps[0], timestamps[timestamps.length - 1]],
-        y: [0, 0],
+        x: timestamps,
+        y: new Array(timestamps.length).fill(0),
         type: 'scatter',
         mode: 'lines',
         name: '中心線 (0)',
         line: { color: palette.subtext, width: 1, dash: 'dot' },
-        showlegend: false
+        showlegend: false,
+        hoverinfo: 'skip'
       }
     ];
 
@@ -310,15 +326,31 @@ export function renderChart(
 
     const cusumAnnotations = [];
     if (showCusumAlerts && cusumResult.anomalies) {
+      const totalCount = timestamps.length;
       for (const anom of cusumResult.anomalies) {
         const isPos = anom.type === 'positive';
-        const isNearRight = timestamps.indexOf(anom.startTime) > timestamps.length * 0.85;
+        const anomIdx = timestamps.indexOf(anom.startTime);
+        const isNearRight = anomIdx > totalCount * 0.65;
+        const isNearLeft = anomIdx < totalCount * 0.20;
+
+        let xanchor = 'center';
+        let ax = 0;
+        if (isNearRight) {
+          xanchor = 'right';
+          ax = -50;
+        } else if (isNearLeft) {
+          xanchor = 'left';
+          ax = 50;
+        }
+
         cusumAnnotations.push({
           x: anom.startTime,
           y: isPos ? h : -h,
           xref: 'x',
           yref: 'y',
-          xanchor: isNearRight ? 'right' : 'left',
+          xanchor: xanchor,
+          ax: ax,
+          ay: isPos ? -35 : 35,
           text: `⚠️ ${anom.label}`,
           showarrow: true,
           arrowhead: 2,
@@ -534,14 +566,19 @@ export function renderChart(
     // Overlay CUSUM Shading
     if (showCusumAlerts && cusumResult && cusumResult.hasAnomaly) {
       shapes.push(...buildCusumShades());
+      const totalCount = timestamps.length;
       for (const anom of cusumResult.anomalies) {
-        const isNearRight = timestamps.indexOf(anom.startTime) > timestamps.length * 0.85;
+        const anomIdx = timestamps.indexOf(anom.startTime);
+        const isNearRight = anomIdx > totalCount * 0.65;
+        const isNearLeft = anomIdx < totalCount * 0.15;
+        const xanchor = isNearRight ? 'right' : (isNearLeft ? 'left' : 'center');
+
         annotations.push({
           x: anom.startTime,
           y: 1,
           xref: 'x',
           yref: 'paper',
-          xanchor: isNearRight ? 'right' : 'left',
+          xanchor: xanchor,
           text: `⚠️ CUSUM異常`,
           showarrow: false,
           font: { color: palette.cusumLimit, size: 10, weight: 600 },

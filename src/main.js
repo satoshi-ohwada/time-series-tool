@@ -1,14 +1,14 @@
 /**
  * Main application integration logic
  */
-import { parsePastedText, parseFileBuffer, decodeCsvBuffer, detectColumns, extractTimeSeries, detectPeriodicity, interpolateMissingSeries } from './parser.js?v=20';
-import { stlDecompose } from './stl.js?v=20';
-import { detectTrendChangePoints } from './changePoint.js?v=20';
-import { calculateResidualCusum } from './cusum.js?v=20';
-import { renderChart, downloadChartImage } from './chart.js?v=20';
-import { exportSingleVariableCSV, exportAllVariablesCSV } from './exporter.js?v=20';
-import { renderTableEditor } from './tableEditor.js?v=20';
-import { renderResultTable } from './resultTable.js?v=20';
+import { parsePastedText, parseFileBuffer, decodeCsvBuffer, detectColumns, extractTimeSeries, detectPeriodicity, interpolateMissingSeries } from './parser.js?v=23';
+import { stlDecompose } from './stl.js?v=23';
+import { detectTrendChangePoints } from './changePoint.js?v=23';
+import { calculateResidualCusum } from './cusum.js?v=23';
+import { renderChart, downloadChartImage } from './chart.js?v=23';
+import { exportSingleVariableCSV, exportAllVariablesCSV } from './exporter.js?v=23';
+import { renderTableEditor } from './tableEditor.js?v=23';
+import { renderResultTable } from './resultTable.js?v=23';
 
 const state = {
   rawRows: [],

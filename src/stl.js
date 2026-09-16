@@ -86,7 +86,7 @@ export function loess(x, y, span, robustWeights = null) {
  * Filters the series using MA(period), MA(period), MA(3), followed by LOESS smoothing.
  * Series is extended by `period` points at each end to avoid edge distortion.
  */
-function lowPassFilter(series, period, tWindow, robustWeights = null) {
+function lowPassFilter(series, period, lWindow, robustWeights = null) {
   const n = series.length;
   if (n <= period) return new Array(n).fill(0);
 
@@ -132,7 +132,7 @@ function lowPassFilter(series, period, tWindow, robustWeights = null) {
 
   // LOESS smoothing of pass3
   const x = Array.from({ length: n }, (_, i) => i);
-  return loess(x, pass3, tWindow, robustWeights);
+  return loess(x, pass3, lWindow, robustWeights);
 }
 
 /**
@@ -177,6 +177,8 @@ export function stlDecompose(data, options = {}) {
   const numSWindow = typeof sWindow === 'number' ? sWindow : 7;
   const defaultTrendWindow = Math.max(period + 1, Math.ceil((1.5 * period) / (1 - 1.5 / Math.max(7, numSWindow))));
   const tWindow = options.trendWindow || (defaultTrendWindow % 2 === 0 ? defaultTrendWindow + 1 : defaultTrendWindow);
+  const defaultLowPassWindow = period % 2 === 0 ? period + 1 : period;
+  const lWindow = options.lowPassWindow || defaultLowPassWindow;
 
   const innerLoops = options.innerLoops || 2;
   const outerLoops = options.outerLoops || 1;
@@ -235,7 +237,7 @@ export function stlDecompose(data, options = {}) {
         }
 
         // Step 3: Low-pass filtering of seasonal component
-        const lowPass = lowPassFilter(rawSeasonal, period, tWindow, robustWeights);
+        const lowPass = lowPassFilter(rawSeasonal, period, lWindow, robustWeights);
         for (let i = 0; i < n; i++) {
           seasonal[i] = rawSeasonal[i] - lowPass[i];
         }

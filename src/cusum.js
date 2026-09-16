@@ -88,7 +88,9 @@ export function calculateResidualCusum(timestamps, residual, options = {}) {
   let target = 0;
   if (typeof options.target === 'number') {
     target = options.target;
-  } else if (options.multiplicative || Math.abs(mean - 1.0) < Math.abs(mean - 0.0)) {
+  } else if (options.multiplicative !== undefined) {
+    target = options.multiplicative ? 1.0 : 0.0;
+  } else if (Math.abs(mean - 1.0) < Math.abs(mean - 0.0)) {
     target = 1.0;
   }
 
