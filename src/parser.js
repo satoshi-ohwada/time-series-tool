@@ -279,7 +279,13 @@ function formatInterpolatedDate(baseParsed, stepIndex, stepMs) {
     const m = String(newD.getMonth() + 1).padStart(2, '0');
     return `${y}${sep}${m}`;
   } else if (type === 'day') {
-    const newD = new Date(date.getFullYear(), date.getMonth(), date.getDate() + stepIndex);
+    const isMonthlyStep = stepMs >= 24 * 3600 * 1000 * 25 && stepMs <= 24 * 3600 * 1000 * 35;
+    let newD;
+    if (isMonthlyStep) {
+      newD = new Date(date.getFullYear(), date.getMonth() + stepIndex, date.getDate());
+    } else {
+      newD = new Date(date.getFullYear(), date.getMonth(), date.getDate() + stepIndex);
+    }
     const y = newD.getFullYear();
     const m = String(newD.getMonth() + 1).padStart(2, '0');
     const d = String(newD.getDate()).padStart(2, '0');
@@ -387,21 +393,45 @@ export function extractTimeSeries(rows, timeCol, valueCol) {
     let rawTime = row[timeCol];
     let timeStr = '';
     if (rawTime instanceof Date) {
-      // Use local calendar year/month/date to avoid UTC timezone day-shifting (e.g. in JST)
-      const y = rawTime.getFullYear();
-      const m = String(rawTime.getMonth() + 1).padStart(2, '0');
-      const d = String(rawTime.getDate()).padStart(2, '0');
-      const hours = rawTime.getHours();
-      const minutes = rawTime.getMinutes();
-      if (hours !== 0 || minutes !== 0) {
+      // SheetJS parses date cells to UTC midnight.
+      // If UTC time is 00:00:00, use UTC methods to avoid unwanted +9h shift (09:00) or timezone day shift.
+      const isUtcMidnight = rawTime.getUTCHours() === 0 && rawTime.getUTCMinutes() === 0 && rawTime.getUTCSeconds() === 0;
+      if (isUtcMidnight) {
+        const y = rawTime.getUTCFullYear();
+        const m = String(rawTime.getUTCMonth() + 1).padStart(2, '0');
+        const d = String(rawTime.getUTCDate()).padStart(2, '0');
+        timeStr = `${y}-${m}-${d}`;
+      } else {
+        const y = rawTime.getFullYear();
+        const m = String(rawTime.getMonth() + 1).padStart(2, '0');
+        const d = String(rawTime.getDate()).padStart(2, '0');
+        const hours = rawTime.getHours();
+        const minutes = rawTime.getMinutes();
         const hh = String(hours).padStart(2, '0');
         const mm = String(minutes).padStart(2, '0');
-        timeStr = `${y}/${m}/${d} ${hh}:${mm}`;
-      } else {
-        timeStr = `${y}/${m}/${d}`;
+        timeStr = `${y}-${m}-${d} ${hh}:${mm}`;
       }
     } else if (rawTime !== undefined && rawTime !== null) {
-      timeStr = String(rawTime).trim();
+      const s = String(rawTime).trim();
+      // Normalize 'YYYY-M-D' or 'YYYY/M/D' to zero-padded 'YYYY-MM-DD' or 'YYYY/MM/DD'
+      const mDay = s.match(/^(\d{4})([-\/])(\d{1,2})([-\/])(\d{1,2})$/);
+      if (mDay) {
+        const y = mDay[1];
+        const sep = mDay[2];
+        const m = mDay[3].padStart(2, '0');
+        const d = mDay[5].padStart(2, '0');
+        timeStr = `${y}${sep}${m}${sep}${d}`;
+      } else {
+        const mMonth = s.match(/^(\d{4})([-\/])(\d{1,2})$/);
+        if (mMonth) {
+          const y = mMonth[1];
+          const sep = mMonth[2];
+          const m = mMonth[3].padStart(2, '0');
+          timeStr = `${y}${sep}${m}`;
+        } else {
+          timeStr = s;
+        }
+      }
     }
 
     const rawVal = row[valueCol];

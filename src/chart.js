@@ -110,9 +110,11 @@ export function renderChart(
   const nPoints = timestamps ? timestamps.length : 0;
 
   const commonXAxis = {
+    type: 'category',
     gridcolor: palette.grid,
     zerolinecolor: palette.grid,
     tickfont: { color: palette.subtext },
+    automargin: true,
     ...(nPoints > 0 ? {
       range: [-0.5, nPoints - 0.5],
       autorange: false

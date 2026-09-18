@@ -1,7 +1,7 @@
 /**
  * STL Decomposition Result Table Viewer module
  */
-import { exportSingleVariableCSV, exportAllVariablesCSV } from './exporter.js?v=23';
+import { exportSingleVariableCSV, exportAllVariablesCSV } from './exporter.js?v=26';
 
 /**
  * Render STL decomposition calculation results as an interactive table

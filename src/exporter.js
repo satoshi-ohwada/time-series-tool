@@ -101,6 +101,7 @@ export function exportAllVariablesCSV(timestamps, allDecompositions) {
       const idxMap = varIndexMaps.get(varName);
       const idx = idxMap ? idxMap.get(tStr) : i;
 
+      if (idx !== undefined && res && res.observed && res.observed[idx] !== undefined) {
         const isMul = !!(res.isMultiplicative || res._autoDetected === 'multiplicative');
         const adj = res.adjusted ? res.adjusted[idx] : (res.observed[idx] !== undefined && res.seasonal[idx] !== undefined ? (isMul && res.seasonal[idx] !== 0 ? res.observed[idx] / res.seasonal[idx] : res.observed[idx] - res.seasonal[idx]) : '');
         rowCols.push(

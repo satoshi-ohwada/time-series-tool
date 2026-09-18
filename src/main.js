@@ -1,14 +1,14 @@
 /**
  * Main application integration logic
  */
-import { parsePastedText, parseFileBuffer, decodeCsvBuffer, detectColumns, extractTimeSeries, detectPeriodicity, interpolateMissingSeries } from './parser.js?v=23';
-import { stlDecompose } from './stl.js?v=23';
-import { detectTrendChangePoints } from './changePoint.js?v=23';
-import { calculateResidualCusum } from './cusum.js?v=23';
-import { renderChart, downloadChartImage } from './chart.js?v=23';
-import { exportSingleVariableCSV, exportAllVariablesCSV } from './exporter.js?v=23';
-import { renderTableEditor } from './tableEditor.js?v=23';
-import { renderResultTable } from './resultTable.js?v=23';
+import { parsePastedText, parseFileBuffer, decodeCsvBuffer, detectColumns, extractTimeSeries, detectPeriodicity, interpolateMissingSeries } from './parser.js?v=26';
+import { stlDecompose } from './stl.js?v=26';
+import { detectTrendChangePoints } from './changePoint.js?v=26';
+import { calculateResidualCusum } from './cusum.js?v=26';
+import { renderChart, downloadChartImage } from './chart.js?v=26';
+import { exportSingleVariableCSV, exportAllVariablesCSV } from './exporter.js?v=26';
+import { renderTableEditor } from './tableEditor.js?v=26';
+import { renderResultTable } from './resultTable.js?v=26';
 
 const state = {
   rawRows: [],
@@ -83,20 +83,30 @@ function initEventListeners() {
   window.addEventListener('drop', (e) => e.preventDefault());
 
   // File Upload & Drag & Drop
-  dropZone.addEventListener('dragover', (e) => {
+  const onDragOver = (e) => {
     e.preventDefault();
     dropZone.classList.add('dragover');
-  });
-  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
-  dropZone.addEventListener('drop', (e) => {
+  };
+  const onDragLeave = () => dropZone.classList.remove('dragover');
+  const onDrop = (e) => {
     e.preventDefault();
     dropZone.classList.remove('dragover');
-    if (e.dataTransfer.files.length > 0) {
-      handleFile(e.dataTransfer.files[0]);
+    const files = e.dataTransfer ? e.dataTransfer.files : null;
+    if (files && files.length > 0) {
+      handleFile(files[0]);
     }
-  });
+  };
+
+  dropZone.addEventListener('dragover', onDragOver);
+  dropZone.addEventListener('dragleave', onDragLeave);
+  dropZone.addEventListener('drop', onDrop);
+
+  fileInput.addEventListener('dragover', onDragOver);
+  fileInput.addEventListener('dragleave', onDragLeave);
+  fileInput.addEventListener('drop', onDrop);
+
   fileInput.addEventListener('change', (e) => {
-    if (e.target.files.length > 0) {
+    if (e.target.files && e.target.files.length > 0) {
       handleFile(e.target.files[0]);
     }
   });
@@ -278,20 +288,31 @@ function switchInputTab(type) {
 
 async function handleFile(file) {
   try {
-    let rows;
-    const isCsv = file.name.toLowerCase().endsWith('.csv');
+    let rows = null;
+    const lowerName = file.name ? file.name.toLowerCase() : '';
+    const isExplicitExcel = lowerName.endsWith('.xlsx') || lowerName.endsWith('.xls');
     const arrayBuffer = await file.arrayBuffer();
 
-    if (isCsv) {
-      // Decode with automatic UTF-8 / Shift_JIS detection
-      const text = decodeCsvBuffer(arrayBuffer);
-      rows = parseFileBuffer(text, true);
-      // Fallback to text parser if SheetJS returned empty
-      if (!rows || rows.length === 0) {
-        rows = parsePastedText(text);
-      }
-    } else {
+    if (isExplicitExcel) {
       rows = parseFileBuffer(arrayBuffer, false);
+    } else {
+      // TSV, CSV, TXT, or text-based files
+      try {
+        // Decode with automatic UTF-8 / Shift_JIS detection
+        const text = decodeCsvBuffer(arrayBuffer);
+        // Try delimiter-aware text parser first (supports Tab, Comma, Semicolon)
+        try {
+          rows = parsePastedText(text);
+        } catch (pasteErr) {
+          rows = parseFileBuffer(text, true);
+        }
+        if (!rows || rows.length === 0) {
+          rows = parseFileBuffer(text, true);
+        }
+      } catch (textErr) {
+        // Fallback to Excel binary parser just in case
+        rows = parseFileBuffer(arrayBuffer, false);
+      }
     }
     processParsedRows(rows);
   } catch (err) {
@@ -808,7 +829,7 @@ function updateSummaryStats() {
 }
 
 // Initialize App
-document.addEventListener('DOMContentLoaded', () => {
+function initApp() {
   initEventListeners();
 
   // Auto resize Plotly chart on window resize
@@ -818,4 +839,10 @@ document.addEventListener('DOMContentLoaded', () => {
       window.Plotly.Plots.resize(container);
     }
   });
-});
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initApp);
+} else {
+  initApp();
+}
