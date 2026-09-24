@@ -5,7 +5,7 @@ import { parsePastedText, parseFileBuffer, decodeCsvBuffer, detectColumns, extra
 import { stlDecompose } from './stl.js?v=26';
 import { detectTrendChangePoints } from './changePoint.js?v=26';
 import { calculateResidualCusum } from './cusum.js?v=26';
-import { renderChart, downloadChartImage } from './chart.js?v=26';
+import { renderChart, downloadChartImage } from './chart.js?v=27';
 import { exportSingleVariableCSV, exportAllVariablesCSV } from './exporter.js?v=26';
 import { renderTableEditor } from './tableEditor.js?v=26';
 import { renderResultTable } from './resultTable.js?v=26';
@@ -136,7 +136,9 @@ function initEventListeners() {
 
   // Download Chart Image (PNG)
   downloadImageBtn.addEventListener('click', () => {
-    const filename = state.customTitle.trim() ? `${state.customTitle.trim()}.png` : `stl_${state.selectedVar}_chart.png`;
+    // 拡張子なしのベースファイル名を渡す（Plotlyが自動的に .png を付与するため）
+    const rawTitle = state.customTitle.trim();
+    const filename = rawTitle ? rawTitle.replace(/\.png$/i, '') : `stl_${state.selectedVar}_chart`;
     downloadChartImage('chartContainer', filename);
   });
 

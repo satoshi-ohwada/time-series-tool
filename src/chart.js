@@ -710,14 +710,17 @@ export function renderChart(
  * @param {string} containerId 
  * @param {string} filename 
  */
-export function downloadChartImage(containerId, filename = 'stl_chart.png') {
+export function downloadChartImage(containerId, filename = 'stl_chart') {
   const container = document.getElementById(containerId);
   if (!container) return;
+
+  // Plotly.downloadImageは自動で拡張子(.png)を付与するため、末尾の.pngがあれば除去して二重拡張子を防止
+  const baseFilename = (filename || 'stl_chart').replace(/\.png$/i, '');
 
   Plotly.downloadImage(container, {
     format: 'png',
     width: 1400,
     height: 800,
-    filename: filename
+    filename: baseFilename
   });
 }
