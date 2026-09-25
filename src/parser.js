@@ -282,9 +282,27 @@ function formatInterpolatedDate(baseParsed, stepIndex, stepMs) {
     const isMonthlyStep = stepMs >= 24 * 3600 * 1000 * 25 && stepMs <= 24 * 3600 * 1000 * 35;
     let newD;
     if (isMonthlyStep) {
-      newD = new Date(date.getFullYear(), date.getMonth() + stepIndex, date.getDate());
+      const targetYear = date.getFullYear();
+      const targetMonth = date.getMonth() + stepIndex;
+      const originalDay = date.getDate();
+      const lastDayOfOrigMonth = new Date(targetYear, date.getMonth() + 1, 0).getDate();
+      const lastDayOfTargetMonth = new Date(targetYear, targetMonth + 1, 0).getDate();
+
+      if (originalDay === lastDayOfOrigMonth) {
+        // 元が月末（28/29/30/31日）の場合は各月の末日を維持
+        newD = new Date(targetYear, targetMonth + 1, 0);
+      } else {
+        // 対象月の日数を超えないようクランプ（例: 30日指定で2月の場合など）
+        const clampedDay = Math.min(originalDay, lastDayOfTargetMonth);
+        newD = new Date(targetYear, targetMonth, clampedDay);
+      }
     } else {
-      newD = new Date(date.getFullYear(), date.getMonth(), date.getDate() + stepIndex);
+      const dayStep = Math.round(stepMs / (24 * 3600 * 1000));
+      if (dayStep > 0) {
+        newD = new Date(date.getFullYear(), date.getMonth(), date.getDate() + stepIndex * dayStep);
+      } else {
+        newD = new Date(date.getTime() + stepIndex * stepMs);
+      }
     }
     const y = newD.getFullYear();
     const m = String(newD.getMonth() + 1).padStart(2, '0');
