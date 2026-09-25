@@ -6,9 +6,9 @@ import { stlDecompose } from './stl.js?v=26';
 import { detectTrendChangePoints } from './changePoint.js?v=26';
 import { calculateResidualCusum } from './cusum.js?v=26';
 import { renderChart, downloadChartImage } from './chart.js?v=27';
-import { exportSingleVariableCSV, exportAllVariablesCSV } from './exporter.js?v=26';
+import { exportSingleVariableCSV, exportAllVariablesCSV } from './exporter.js?v=28';
 import { renderTableEditor } from './tableEditor.js?v=26';
-import { renderResultTable } from './resultTable.js?v=26';
+import { renderResultTable } from './resultTable.js?v=28';
 
 const state = {
   rawRows: [],
@@ -692,7 +692,8 @@ function updateResultTableDisplay(force = false) {
     state.selectedVar,
     ensureAllDecompositions,
     currentAnalytics,
-    state.valueCols.length > 1
+    state.valueCols.length > 1,
+    state.valueCols
   );
 }
 

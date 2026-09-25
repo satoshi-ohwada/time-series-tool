@@ -1,7 +1,7 @@
 /**
  * STL Decomposition Result Table Viewer module
  */
-import { exportSingleVariableCSV, exportAllVariablesCSV } from './exporter.js?v=26';
+import { exportSingleVariableCSV, exportAllVariablesCSV } from './exporter.js?v=28';
 
 /**
  * Render STL decomposition calculation results as an interactive table
@@ -13,7 +13,7 @@ import { exportSingleVariableCSV, exportAllVariablesCSV } from './exporter.js?v=
  * @param {Object<string, object>} [allDecompositions] - All variables decompositions map
  * @param {object} [analyticsOptions] - { changePoints, cusumResult }
  */
-export function renderResultTable(containerId, timestamps, stlResult, varName, allDecompositions = {}, analyticsOptions = {}, hasMultipleVarsOverride = null) {
+export function renderResultTable(containerId, timestamps, stlResult, varName, allDecompositions = {}, analyticsOptions = {}, hasMultipleVarsOverride = null, orderedVarNames = null) {
   const container = document.getElementById(containerId);
   if (!container) return;
 
@@ -132,7 +132,7 @@ export function renderResultTable(containerId, timestamps, stlResult, varName, a
       const resolvedDecompositions = typeof allDecompositions === 'function'
         ? allDecompositions()
         : allDecompositions;
-      exportAllVariablesCSV(timestamps, resolvedDecompositions);
+      exportAllVariablesCSV(timestamps, resolvedDecompositions, orderedVarNames);
     });
   }
 }

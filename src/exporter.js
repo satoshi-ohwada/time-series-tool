@@ -63,12 +63,35 @@ export function exportSingleVariableCSV(timestamps, stlResult, varName, analytic
 /**
  * Downloads all variables' STL decomposition results as a unified CSV
  * 
- * @param {string[]} timestamps 
+ * @param {string[]} timestamps - Fallback timestamps
  * @param {Object<string, object>} allDecompositions - Map of varName to stlResult
+ * @param {string[]} [orderedVarNames] - Optional list of variables in desired order
  */
-export function exportAllVariablesCSV(timestamps, allDecompositions) {
-  const varNames = Object.keys(allDecompositions);
+export function exportAllVariablesCSV(timestamps, allDecompositions, orderedVarNames = null) {
+  const varNames = (orderedVarNames && orderedVarNames.length > 0)
+    ? orderedVarNames.filter(v => allDecompositions[v])
+    : Object.keys(allDecompositions);
   if (varNames.length === 0) return;
+
+  // Build a complete unified timeline across ALL variables so no month is dropped
+  const unifiedTimeSet = new Set();
+  if (timestamps && Array.isArray(timestamps)) {
+    timestamps.forEach(t => unifiedTimeSet.add(t));
+  }
+  varNames.forEach(varName => {
+    const res = allDecompositions[varName];
+    if (res && res.timestamps && Array.isArray(res.timestamps)) {
+      res.timestamps.forEach(t => unifiedTimeSet.add(t));
+    }
+  });
+
+  const fullTimeline = Array.from(unifiedTimeSet);
+  fullTimeline.sort((a, b) => {
+    const da = Date.parse(a);
+    const db = Date.parse(b);
+    if (!isNaN(da) && !isNaN(db)) return da - db;
+    return a.localeCompare(b);
+  });
 
   const headerCols = ['日付'];
   varNames.forEach(varName => {
@@ -93,13 +116,13 @@ export function exportAllVariablesCSV(timestamps, allDecompositions) {
     }
   });
 
-  for (let i = 0; i < timestamps.length; i++) {
-    const tStr = timestamps[i];
+  for (let i = 0; i < fullTimeline.length; i++) {
+    const tStr = fullTimeline[i];
     const rowCols = [formatCSVField(tStr)];
     varNames.forEach(varName => {
       const res = allDecompositions[varName];
       const idxMap = varIndexMaps.get(varName);
-      const idx = idxMap ? idxMap.get(tStr) : i;
+      const idx = idxMap ? idxMap.get(tStr) : undefined;
 
       if (idx !== undefined && res && res.observed && res.observed[idx] !== undefined) {
         const isMul = !!(res.isMultiplicative || res._autoDetected === 'multiplicative');
