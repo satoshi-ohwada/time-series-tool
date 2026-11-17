@@ -9,18 +9,24 @@
  * @param {object} stlResult - { observed, trend, seasonal, residual }
  * @param {string} varName 
  * @param {object} [analyticsOptions] - { changePoints, cusumResult }
+ * @param {object} [groupOptions] - { groupCol, selectedGroup }
  */
-export function exportSingleVariableCSV(timestamps, stlResult, varName, analyticsOptions = {}) {
+export function exportSingleVariableCSV(timestamps, stlResult, varName, analyticsOptions = {}, groupOptions = {}) {
   const { changePoints = [], cusumResult = null } = analyticsOptions;
+  const { groupCol = '', selectedGroup = '' } = groupOptions;
   const cpMap = new Map();
   if (changePoints) {
     for (const cp of changePoints) cpMap.set(cp.index, cp.label);
   }
 
   const hasCusum = cusumResult && cusumResult.anomalyIndices;
+  const hasGroup = !!(groupCol && selectedGroup);
 
-  const headerCols = [
-    '日付',
+  const headerCols = ['日付'];
+  if (hasGroup) {
+    headerCols.push(groupCol || '観測点');
+  }
+  headerCols.push(
     `${varName}_元データ`,
     `${varName}_トレンド`,
     `${varName}_周期変動`,
@@ -28,7 +34,7 @@ export function exportSingleVariableCSV(timestamps, stlResult, varName, analytic
     `${varName}_残差`,
     `${varName}_トレンド変化点`,
     `${varName}_CUSUM異常フラグ`
-  ];
+  );
 
   const rows = [headerCols.join(',')];
   const { observed, trend, seasonal, residual } = stlResult;
@@ -43,8 +49,11 @@ export function exportSingleVariableCSV(timestamps, stlResult, varName, analytic
     const cpLabel = cpMap.get(i) || '';
     const cusumFlag = hasCusum && cusumResult.anomalyIndices[i] ? '1' : '0';
 
-    const row = [
-      formatCSVField(timestamps[i]),
+    const rowCols = [formatCSVField(timestamps[i])];
+    if (hasGroup) {
+      rowCols.push(formatCSVField(selectedGroup));
+    }
+    rowCols.push(
       observed[i] !== undefined ? observed[i] : '',
       trend[i] !== undefined ? trend[i] : '',
       seasonal[i] !== undefined ? seasonal[i] : '',
@@ -52,12 +61,13 @@ export function exportSingleVariableCSV(timestamps, stlResult, varName, analytic
       residual[i] !== undefined ? residual[i] : '',
       formatCSVField(cpLabel),
       cusumFlag
-    ].join(',');
-    rows.push(row);
+    );
+    rows.push(rowCols.join(','));
   }
 
   const csvContent = '\uFEFF' + rows.join('\r\n');
-  triggerDownload(csvContent, `stl_result_${sanitizeFilename(varName)}.csv`);
+  const groupPart = hasGroup ? `${sanitizeFilename(selectedGroup)}_` : '';
+  triggerDownload(csvContent, `stl_result_${groupPart}${sanitizeFilename(varName)}.csv`);
 }
 
 /**
@@ -66,8 +76,11 @@ export function exportSingleVariableCSV(timestamps, stlResult, varName, analytic
  * @param {string[]} timestamps - Fallback timestamps
  * @param {Object<string, object>} allDecompositions - Map of varName to stlResult
  * @param {string[]} [orderedVarNames] - Optional list of variables in desired order
+ * @param {object} [groupOptions] - { groupCol, selectedGroup }
  */
-export function exportAllVariablesCSV(timestamps, allDecompositions, orderedVarNames = null) {
+export function exportAllVariablesCSV(timestamps, allDecompositions, orderedVarNames = null, groupOptions = {}) {
+  const { groupCol = '', selectedGroup = '' } = groupOptions;
+  const hasGroup = !!(groupCol && selectedGroup);
   const varNames = (orderedVarNames && orderedVarNames.length > 0)
     ? orderedVarNames.filter(v => allDecompositions[v])
     : Object.keys(allDecompositions);
@@ -94,6 +107,9 @@ export function exportAllVariablesCSV(timestamps, allDecompositions, orderedVarN
   });
 
   const headerCols = ['日付'];
+  if (hasGroup) {
+    headerCols.push(groupCol || '観測点');
+  }
   varNames.forEach(varName => {
     headerCols.push(
       `${varName}_元データ`,
@@ -119,6 +135,9 @@ export function exportAllVariablesCSV(timestamps, allDecompositions, orderedVarN
   for (let i = 0; i < fullTimeline.length; i++) {
     const tStr = fullTimeline[i];
     const rowCols = [formatCSVField(tStr)];
+    if (hasGroup) {
+      rowCols.push(formatCSVField(selectedGroup));
+    }
     varNames.forEach(varName => {
       const res = allDecompositions[varName];
       const idxMap = varIndexMaps.get(varName);
@@ -142,7 +161,8 @@ export function exportAllVariablesCSV(timestamps, allDecompositions, orderedVarN
   }
 
   const csvContent = '\uFEFF' + rows.join('\r\n');
-  triggerDownload(csvContent, `stl_results_all_variables.csv`);
+  const groupPart = hasGroup ? `_${sanitizeFilename(selectedGroup)}` : '';
+  triggerDownload(csvContent, `stl_results_all_variables${groupPart}.csv`);
 }
 
 function formatCSVField(field) {

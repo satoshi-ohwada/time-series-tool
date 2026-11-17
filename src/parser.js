@@ -158,6 +158,133 @@ export function detectColumns(rows) {
 }
 
 /**
+ * Checks if the time column contains duplicate timestamps
+ * @param {Array<Object>} rows
+ * @param {string} timeCol
+ * @returns {{ hasDuplicates: boolean, duplicateRatio: number, maxCount: number }}
+ */
+export function checkDuplicateTimestamps(rows, timeCol) {
+  if (!rows || rows.length === 0 || !timeCol) {
+    return { hasDuplicates: false, duplicateRatio: 0, maxCount: 1 };
+  }
+  const timeCounts = new Map();
+  let duplicateInstances = 0;
+  let maxCount = 1;
+
+  for (const row of rows) {
+    const rawVal = row[timeCol];
+    if (rawVal === undefined || rawVal === null || rawVal === '') continue;
+    const timeKey = String(rawVal).trim();
+    const count = (timeCounts.get(timeKey) || 0) + 1;
+    timeCounts.set(timeKey, count);
+    if (count === 2) {
+      duplicateInstances += 2;
+    } else if (count > 2) {
+      duplicateInstances += 1;
+    }
+    if (count > maxCount) maxCount = count;
+  }
+
+  const hasDuplicates = duplicateInstances > 0;
+  const duplicateRatio = duplicateInstances / Math.max(rows.length, 1);
+  return { hasDuplicates, duplicateRatio, maxCount };
+}
+
+/**
+ * Detects candidate group/category columns (e.g. observation points, stations, sites, stores, IDs)
+ * @param {Array<Object>} rows
+ * @param {string} timeCol
+ * @param {string[]} valueCols
+ * @returns {{ candidateCols: string[], bestGroupCol: string }}
+ */
+export function detectGroupColumns(rows, timeCol, valueCols = []) {
+  if (!rows || rows.length === 0) return { candidateCols: [], bestGroupCol: '' };
+  const allKeys = Object.keys(rows[0] || {});
+  const nonTimeCols = allKeys.filter(k => k !== timeCol);
+
+  const groupKeywords = [
+    '観測', '地点', '場所', '測候所', 'ステーション', 'station', 'point', 'loc', 'location', 'site',
+    '店舗', '店', '支店', '支社', '拠点', 'store', 'shop', 'branch',
+    'グループ', 'group', 'カテゴリ', 'category', 'クラス', 'class',
+    '地域', '地区', 'エリア', 'area', 'region', '都道府県', '県', '市', '区',
+    'id', 'コード', 'code', 'name', '名前', '名称', 'type', '種別'
+  ];
+
+  const candidateScores = [];
+
+  for (const col of nonTimeCols) {
+    const valSet = new Set();
+    const sampleLimit = Math.min(rows.length, 1000);
+
+    for (let i = 0; i < sampleLimit; i++) {
+      const val = rows[i][col];
+      if (val !== undefined && val !== null && val !== '') {
+        valSet.add(String(val).trim());
+      }
+    }
+
+    const uniqueCount = valSet.size;
+    // Group columns typically have between 2 and sampleLimit * 0.8 unique values
+    if (uniqueCount < 2 || uniqueCount > sampleLimit * 0.8) {
+      continue;
+    }
+
+    let score = 10;
+    const lowerCol = col.toLowerCase();
+
+    // Keyword match
+    for (const kw of groupKeywords) {
+      if (lowerCol.includes(kw)) {
+        score += 50;
+        break;
+      }
+    }
+
+    // If NOT in valueCols (not predominantly numeric), give higher score
+    if (!valueCols.includes(col)) {
+      score += 30;
+    }
+
+    // Moderate unique count is preferred (e.g., 2 to 100 groups)
+    if (uniqueCount >= 2 && uniqueCount <= 100) {
+      score += 20;
+    }
+
+    candidateScores.push({ col, score, uniqueCount });
+  }
+
+  candidateScores.sort((a, b) => b.score - a.score);
+  const candidateCols = candidateScores.map(c => c.col);
+  const bestGroupCol = candidateCols[0] || '';
+
+  return { candidateCols, bestGroupCol };
+}
+
+/**
+ * Gets unique values and their row counts for a group column
+ * @param {Array<Object>} rows
+ * @param {string} groupCol
+ * @returns {Array<{ value: string, count: number }>}
+ */
+export function getUniqueGroupValues(rows, groupCol) {
+  if (!rows || rows.length === 0 || !groupCol) return [];
+  const map = new Map();
+  for (const row of rows) {
+    const val = row[groupCol];
+    if (val === undefined || val === null || val === '') continue;
+    const strVal = String(val).trim();
+    map.set(strVal, (map.get(strVal) || 0) + 1);
+  }
+
+  const result = [];
+  map.forEach((count, value) => {
+    result.push({ value, count });
+  });
+
+  return result;
+}
+
+/**
  * Detects periodicity (seasonal period) using Autocorrelation Function (ACF)
  * Uses both 1st-differenced and raw series to prevent trend domination from masking periodic peaks.
  * @param {number[]} values 
@@ -398,16 +525,26 @@ export function interpolateMissingSeries(timestamps, values, enable = true) {
 
 /**
  * Extracts and cleans time-series data for a selected target column
+ * Optionally filters rows by a group column and value (e.g. observation point)
  * @param {Array<Object>} rows 
  * @param {string} timeCol 
  * @param {string} valueCol 
+ * @param {string|null} [groupCol=null]
+ * @param {string|null} [selectedGroup=null]
  * @returns {{ timestamps: string[], values: number[] }}
  */
-export function extractTimeSeries(rows, timeCol, valueCol) {
-  const timestamps = [];
-  const values = [];
+export function extractTimeSeries(rows, timeCol, valueCol, groupCol = null, selectedGroup = null) {
+  const points = [];
 
   rows.forEach(row => {
+    // If group filter is active
+    if (groupCol && selectedGroup !== null && selectedGroup !== undefined && selectedGroup !== '') {
+      const rowGroup = row[groupCol];
+      if (rowGroup === undefined || rowGroup === null || String(rowGroup).trim() !== String(selectedGroup).trim()) {
+        return;
+      }
+    }
+
     let rawTime = row[timeCol];
     let timeStr = '';
     if (rawTime instanceof Date) {
@@ -459,10 +596,32 @@ export function extractTimeSeries(rows, timeCol, valueCol) {
     const val = Number(cleanedStr);
 
     if (timeStr && !isNaN(val)) {
-      timestamps.push(timeStr);
-      values.push(val);
+      points.push({ timestamp: timeStr, value: val });
     }
   });
+
+  // Ensure points are sorted chronologically if date formats are parsable
+  let isChronological = true;
+  for (let i = 1; i < points.length; i++) {
+    const prevD = Date.parse(points[i - 1].timestamp);
+    const currD = Date.parse(points[i].timestamp);
+    if (!isNaN(prevD) && !isNaN(currD) && prevD > currD) {
+      isChronological = false;
+      break;
+    }
+  }
+
+  if (!isChronological && points.length > 1) {
+    points.sort((a, b) => {
+      const da = Date.parse(a.timestamp);
+      const db = Date.parse(b.timestamp);
+      if (!isNaN(da) && !isNaN(db)) return da - db;
+      return a.timestamp.localeCompare(b.timestamp);
+    });
+  }
+
+  const timestamps = points.map(p => p.timestamp);
+  const values = points.map(p => p.value);
 
   return { timestamps, values };
 }

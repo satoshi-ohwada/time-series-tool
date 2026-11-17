@@ -1,20 +1,36 @@
 /**
  * Main application integration logic
  */
-import { parsePastedText, parseFileBuffer, decodeCsvBuffer, detectColumns, extractTimeSeries, detectPeriodicity, interpolateMissingSeries } from './parser.js?v=26';
-import { stlDecompose } from './stl.js?v=26';
-import { detectTrendChangePoints } from './changePoint.js?v=26';
-import { calculateResidualCusum } from './cusum.js?v=26';
-import { renderChart, downloadChartImage } from './chart.js?v=27';
-import { exportSingleVariableCSV, exportAllVariablesCSV } from './exporter.js?v=28';
-import { renderTableEditor } from './tableEditor.js?v=26';
-import { renderResultTable } from './resultTable.js?v=28';
+import {
+  parsePastedText,
+  parseFileBuffer,
+  decodeCsvBuffer,
+  detectColumns,
+  extractTimeSeries,
+  detectPeriodicity,
+  interpolateMissingSeries,
+  checkDuplicateTimestamps,
+  detectGroupColumns,
+  getUniqueGroupValues
+} from './parser.js?v=30';
+import { stlDecompose } from './stl.js?v=30';
+import { detectTrendChangePoints } from './changePoint.js?v=30';
+import { calculateResidualCusum } from './cusum.js?v=30';
+import { renderChart, downloadChartImage } from './chart.js?v=30';
+import { exportSingleVariableCSV, exportAllVariablesCSV } from './exporter.js?v=30';
+import { renderTableEditor } from './tableEditor.js?v=30';
+import { renderResultTable } from './resultTable.js?v=30';
 
 const state = {
   rawRows: [],
   timeCol: '',
   valueCols: [],
   selectedVar: '',
+  // Observation Point / Group Filtering
+  hasDuplicateTimestamps: false,
+  groupCol: '',
+  selectedGroup: '',
+  availableGroups: [], // Array<{ value: string, count: number }>
   period: 12,
   model: 'auto', // 'auto' | 'additive' | 'multiplicative'
   seasonalMode: 'periodic', // 'periodic' | 'flexible'
@@ -42,6 +58,22 @@ const applyPasteBtn = document.getElementById('applyPasteBtn');
 const tabFileBtn = document.getElementById('tabFileBtn');
 const tabPasteBtn = document.getElementById('tabPasteBtn');
 const loadDemoBtn = document.getElementById('loadDemoBtn');
+const loadMultiSiteDemoBtn = document.getElementById('loadMultiSiteDemoBtn');
+
+// Group / Observation Point DOM Elements
+const groupFilterSection = document.getElementById('groupFilterSection');
+const duplicateAlertBadge = document.getElementById('duplicateAlertBadge');
+const groupColSelect = document.getElementById('groupColSelect');
+const groupValGroup = document.getElementById('groupValGroup');
+const groupValSelect = document.getElementById('groupValSelect');
+const groupTotalBadge = document.getElementById('groupTotalBadge');
+const prevSidebarGroupBtn = document.getElementById('prevSidebarGroupBtn');
+const nextSidebarGroupBtn = document.getElementById('nextSidebarGroupBtn');
+
+const graphGroupSwitcher = document.getElementById('graphGroupSwitcher');
+const graphGroupValSelect = document.getElementById('graphGroupValSelect');
+const prevGraphGroupBtn = document.getElementById('prevGraphGroupBtn');
+const nextGraphGroupBtn = document.getElementById('nextGraphGroupBtn');
 
 const showGraphModeBtn = document.getElementById('showGraphModeBtn');
 const showResultModeBtn = document.getElementById('showResultModeBtn');
@@ -116,6 +148,43 @@ function initEventListeners() {
 
   // Demo Data
   loadDemoBtn.addEventListener('click', loadDemoData);
+  if (loadMultiSiteDemoBtn) {
+    loadMultiSiteDemoBtn.addEventListener('click', loadMultiSiteDemoData);
+  }
+
+  // Observation Point / Group Selectors Change
+  if (groupColSelect) {
+    groupColSelect.addEventListener('change', (e) => {
+      state.groupCol = e.target.value;
+      updateGroupValueSelects();
+      runDecompositionForAllVars();
+    });
+  }
+
+  if (groupValSelect) {
+    groupValSelect.addEventListener('change', (e) => {
+      setObservationGroup(e.target.value);
+    });
+  }
+
+  if (graphGroupValSelect) {
+    graphGroupValSelect.addEventListener('change', (e) => {
+      setObservationGroup(e.target.value);
+    });
+  }
+
+  if (prevSidebarGroupBtn) {
+    prevSidebarGroupBtn.addEventListener('click', () => navigateObservationGroup(-1));
+  }
+  if (nextSidebarGroupBtn) {
+    nextSidebarGroupBtn.addEventListener('click', () => navigateObservationGroup(1));
+  }
+  if (prevGraphGroupBtn) {
+    prevGraphGroupBtn.addEventListener('click', () => navigateObservationGroup(-1));
+  }
+  if (nextGraphGroupBtn) {
+    nextGraphGroupBtn.addEventListener('click', () => navigateObservationGroup(1));
+  }
 
   // Main Mode Switcher (Graph vs Result vs Table)
   showGraphModeBtn.addEventListener('click', () => switchMainMode('graph'));
@@ -138,7 +207,8 @@ function initEventListeners() {
   downloadImageBtn.addEventListener('click', () => {
     // 拡張子なしのベースファイル名を渡す（Plotlyが自動的に .png を付与するため）
     const rawTitle = state.customTitle.trim();
-    const filename = rawTitle ? rawTitle.replace(/\.png$/i, '') : `stl_${state.selectedVar}_chart`;
+    const groupPrefix = state.groupCol && state.selectedGroup ? `${state.selectedGroup}_` : '';
+    const filename = rawTitle ? rawTitle.replace(/\.png$/i, '') : `stl_${groupPrefix}${state.selectedVar}_chart`;
     downloadChartImage('chartContainer', filename);
   });
 
@@ -155,6 +225,21 @@ function initEventListeners() {
     if (!state.valueCols.includes(state.selectedVar)) {
       state.selectedVar = state.valueCols[0] || '';
     }
+
+    // Duplicate check and group detection on timeCol change
+    const dupCheck = checkDuplicateTimestamps(state.rawRows, state.timeCol);
+    state.hasDuplicateTimestamps = dupCheck.hasDuplicates;
+    const detectedGroups = detectGroupColumns(state.rawRows, state.timeCol, state.valueCols);
+
+    if (state.hasDuplicateTimestamps) {
+      state.groupCol = detectedGroups.bestGroupCol || '';
+      if (groupFilterSection) groupFilterSection.classList.remove('hidden');
+      if (duplicateAlertBadge) duplicateAlertBadge.classList.remove('hidden');
+    } else {
+      if (duplicateAlertBadge) duplicateAlertBadge.classList.add('hidden');
+    }
+    populateGroupControls(detectedGroups.candidateCols);
+
     populateSelects();
     runDecompositionForAllVars();
   });
@@ -206,7 +291,13 @@ function initEventListeners() {
 
   autoDetectPeriodBtn.addEventListener('click', () => {
     if (!state.selectedVar || !state.rawRows.length) return;
-    const { timestamps, values } = extractTimeSeries(state.rawRows, state.timeCol, state.selectedVar);
+    const { timestamps, values } = extractTimeSeries(
+      state.rawRows,
+      state.timeCol,
+      state.selectedVar,
+      state.groupCol,
+      state.selectedGroup
+    );
     const autoPeriod = detectPeriodicity(values, timestamps);
     state.period = Math.max(2, autoPeriod);
     periodInput.value = state.period;
@@ -363,6 +454,79 @@ function loadDemoData() {
   processParsedRows(seatbeltsData);
 }
 
+function loadMultiSiteDemoData() {
+  // 3 locations (Tokyo, Osaka, Sapporo) monthly temperature and precipitation for 5 years (1980/01 - 1984/12)
+  // 60 months * 3 sites = 180 rows
+  const sites = [
+    { name: '東京', baseTemp: 15.8, ampTemp: 10.4, baseRain: 130 },
+    { name: '大阪', baseTemp: 16.9, ampTemp: 11.2, baseRain: 115 },
+    { name: '札幌', baseTemp: 8.9, ampTemp: 13.5, baseRain: 95 }
+  ];
+
+  const rows = [];
+  const years = [1980, 1981, 1982, 1983, 1984];
+
+  for (const year of years) {
+    for (let month = 1; month <= 12; month++) {
+      const mStr = String(month).padStart(2, '0');
+      const timeStr = `${year}/${mStr}`;
+
+      // Seasonal temperature cycle: min in Jan/Feb, max in Aug
+      const tempPhase = ((month - 1) / 12) * 2 * Math.PI - (Math.PI / 2);
+      // Gentle long-term trend (e.g. slight warming over years)
+      const trend = (year - 1980) * 0.12;
+
+      for (const site of sites) {
+        // Deterministic pseudo-noise for reproducibility
+        const noise = Math.sin(year * 17 + month * 13 + site.name.charCodeAt(0)) * 0.7;
+        const temp = site.baseTemp + site.ampTemp * Math.sin(tempPhase) + trend + noise;
+        const roundedTemp = Math.round(temp * 10) / 10;
+
+        // Rainfall (mm) - higher in summer/autumn, lower in winter
+        const rainPhase = ((month - 6) / 12) * 2 * Math.PI;
+        const rainNoise = Math.cos(year * 7 + month * 11 + site.name.charCodeAt(0)) * 18;
+        const rain = Math.max(15, Math.round(site.baseRain + 55 * Math.cos(rainPhase) + rainNoise));
+
+        rows.push({
+          "年月": timeStr,
+          "観測地点": site.name,
+          "平均気温": roundedTemp,
+          "降水量": rain
+        });
+      }
+    }
+  }
+
+  processParsedRows(rows);
+}
+
+function setObservationGroup(groupVal) {
+  if (!state.groupCol || !state.availableGroups.length) return;
+  state.selectedGroup = groupVal;
+  if (groupValSelect) groupValSelect.value = groupVal;
+  if (graphGroupValSelect) graphGroupValSelect.value = groupVal;
+
+  const currentIdx = state.availableGroups.findIndex(g => g.value === groupVal);
+  const isFirst = currentIdx <= 0;
+  const isLast = currentIdx >= state.availableGroups.length - 1;
+
+  if (prevSidebarGroupBtn) prevSidebarGroupBtn.disabled = isFirst;
+  if (nextSidebarGroupBtn) nextSidebarGroupBtn.disabled = isLast;
+  if (prevGraphGroupBtn) prevGraphGroupBtn.disabled = isFirst;
+  if (nextGraphGroupBtn) nextGraphGroupBtn.disabled = isLast;
+
+  runDecompositionForAllVars();
+}
+
+function navigateObservationGroup(delta) {
+  if (!state.groupCol || !state.availableGroups.length) return;
+  const currentIdx = state.availableGroups.findIndex(g => g.value === state.selectedGroup);
+  const newIdx = currentIdx + delta;
+  if (newIdx >= 0 && newIdx < state.availableGroups.length) {
+    setObservationGroup(state.availableGroups[newIdx].value);
+  }
+}
+
 function switchMainMode(mode) {
   state.mainMode = mode;
 
@@ -393,7 +557,6 @@ function switchMainMode(mode) {
   }
 }
 
-
 function updateTableEditorDisplay() {
   if (state.rawRows && state.rawRows.length > 0) {
     renderTableEditor('tableEditorContainer', state.rawRows, (updatedRows) => {
@@ -401,6 +564,19 @@ function updateTableEditorDisplay() {
       const detected = detectColumns(updatedRows);
       state.timeCol = detected.timeCol;
       state.valueCols = detected.valueCols;
+
+      const dupCheck = checkDuplicateTimestamps(updatedRows, state.timeCol);
+      state.hasDuplicateTimestamps = dupCheck.hasDuplicates;
+      const detectedGroups = detectGroupColumns(updatedRows, state.timeCol, state.valueCols);
+      if (state.hasDuplicateTimestamps) {
+        if (!state.groupCol) state.groupCol = detectedGroups.bestGroupCol || '';
+        if (groupFilterSection) groupFilterSection.classList.remove('hidden');
+        if (duplicateAlertBadge) duplicateAlertBadge.classList.remove('hidden');
+      } else {
+        if (duplicateAlertBadge) duplicateAlertBadge.classList.add('hidden');
+      }
+      populateGroupControls(detectedGroups.candidateCols);
+
       runDecompositionForAllVars();
     });
   }
@@ -422,10 +598,47 @@ function processParsedRows(rows) {
     return;
   }
 
-  state.selectedVar = state.valueCols[0];
+  // 1. Detect duplicate timestamps
+  const dupCheck = checkDuplicateTimestamps(rows, state.timeCol);
+  state.hasDuplicateTimestamps = dupCheck.hasDuplicates;
+
+  // 2. Detect candidate group/category columns
+  const detectedGroups = detectGroupColumns(rows, state.timeCol, state.valueCols);
+
+  if (state.hasDuplicateTimestamps) {
+    // If duplicates found, default groupCol to the best candidate if available
+    state.groupCol = detectedGroups.bestGroupCol || '';
+    if (groupFilterSection) groupFilterSection.classList.remove('hidden');
+    if (duplicateAlertBadge) duplicateAlertBadge.classList.remove('hidden');
+  } else {
+    // No duplicates detected (standard single-site data)
+    state.groupCol = '';
+    if (duplicateAlertBadge) duplicateAlertBadge.classList.add('hidden');
+    if (detectedGroups.candidateCols.length > 0) {
+      if (groupFilterSection) groupFilterSection.classList.remove('hidden');
+    } else {
+      if (groupFilterSection) groupFilterSection.classList.add('hidden');
+    }
+  }
+
+  // Populate Group Controls
+  populateGroupControls(detectedGroups.candidateCols);
+
+  // If groupCol is set, valueCols shouldn't include groupCol
+  if (state.groupCol && state.valueCols.includes(state.groupCol)) {
+    state.valueCols = state.valueCols.filter(c => c !== state.groupCol);
+  }
+
+  state.selectedVar = state.valueCols[0] || '';
 
   // Auto detect period
-  const firstData = extractTimeSeries(rows, state.timeCol, state.selectedVar);
+  const firstData = extractTimeSeries(
+    rows,
+    state.timeCol,
+    state.selectedVar,
+    state.groupCol,
+    state.selectedGroup
+  );
   const autoPeriod = detectPeriodicity(firstData.values, firstData.timestamps);
   state.period = autoPeriod;
   periodInput.value = autoPeriod;
@@ -443,8 +656,85 @@ function processParsedRows(rows) {
   updateTableEditorDisplay();
 }
 
+function populateGroupControls(candidateCols = []) {
+  if (!groupColSelect) return;
+  const allKeys = Object.keys(state.rawRows[0] || {});
+  const selectableCols = allKeys.filter(k => k !== state.timeCol);
+
+  groupColSelect.innerHTML = '<option value="">なし (全体)</option>';
+  selectableCols.forEach(col => {
+    const opt = document.createElement('option');
+    opt.value = col;
+    opt.textContent = col;
+    if (col === state.groupCol) opt.selected = true;
+    groupColSelect.appendChild(opt);
+  });
+
+  updateGroupValueSelects();
+}
+
+function updateGroupValueSelects() {
+  if (!state.groupCol) {
+    state.availableGroups = [];
+    state.selectedGroup = '';
+    if (groupValGroup) groupValGroup.classList.add('hidden');
+    if (graphGroupSwitcher) graphGroupSwitcher.classList.add('hidden');
+    return;
+  }
+
+  state.availableGroups = getUniqueGroupValues(state.rawRows, state.groupCol);
+
+  if (state.availableGroups.length === 0) {
+    if (groupValGroup) groupValGroup.classList.add('hidden');
+    if (graphGroupSwitcher) graphGroupSwitcher.classList.add('hidden');
+    return;
+  }
+
+  if (groupValGroup) groupValGroup.classList.remove('hidden');
+  if (graphGroupSwitcher) graphGroupSwitcher.classList.remove('hidden');
+  if (groupTotalBadge) groupTotalBadge.textContent = `全 ${state.availableGroups.length} 地点`;
+
+  // Preserve selected group if still valid, otherwise default to first
+  if (!state.availableGroups.some(g => g.value === state.selectedGroup)) {
+    state.selectedGroup = state.availableGroups[0].value;
+  }
+
+  // Populate sidebar select
+  if (groupValSelect) {
+    groupValSelect.innerHTML = '';
+    state.availableGroups.forEach(g => {
+      const opt = document.createElement('option');
+      opt.value = g.value;
+      opt.textContent = `${g.value} (${g.count}件)`;
+      if (g.value === state.selectedGroup) opt.selected = true;
+      groupValSelect.appendChild(opt);
+    });
+  }
+
+  // Populate graph header select
+  if (graphGroupValSelect) {
+    graphGroupValSelect.innerHTML = '';
+    state.availableGroups.forEach(g => {
+      const opt = document.createElement('option');
+      opt.value = g.value;
+      opt.textContent = g.value;
+      if (g.value === state.selectedGroup) opt.selected = true;
+      graphGroupValSelect.appendChild(opt);
+    });
+  }
+
+  const currentIdx = state.availableGroups.findIndex(g => g.value === state.selectedGroup);
+  const isFirst = currentIdx <= 0;
+  const isLast = currentIdx >= state.availableGroups.length - 1;
+
+  if (prevSidebarGroupBtn) prevSidebarGroupBtn.disabled = isFirst;
+  if (nextSidebarGroupBtn) nextSidebarGroupBtn.disabled = isLast;
+  if (prevGraphGroupBtn) prevGraphGroupBtn.disabled = isFirst;
+  if (nextGraphGroupBtn) nextGraphGroupBtn.disabled = isLast;
+}
+
 function populateSelects() {
-  const allKeys = Object.keys(state.rawRows[0]);
+  const allKeys = Object.keys(state.rawRows[0] || {});
 
   timeColSelect.innerHTML = '';
   allKeys.forEach(key => {
@@ -472,7 +762,13 @@ export function runDecompositionForVar(varName) {
     return state.decompositions[varName];
   }
 
-  const { timestamps: rawT, values: rawV } = extractTimeSeries(state.rawRows, state.timeCol, varName);
+  const { timestamps: rawT, values: rawV } = extractTimeSeries(
+    state.rawRows,
+    state.timeCol,
+    varName,
+    state.groupCol,
+    state.selectedGroup
+  );
   const { timestamps: interpT, values: interpV, interpolatedCount } = interpolateMissingSeries(rawT, rawV, state.enableInterpolation);
 
   if (interpV.length === 0) return null;
@@ -659,13 +955,15 @@ function updateChartDisplay() {
     }
   }
 
+  const displayTitle = state.customTitle || (state.groupCol && state.selectedGroup ? `${state.selectedGroup} - ${state.selectedVar}` : '');
+
   renderChart(
     'chartContainer',
     timestamps,
     currentResult,
     state.viewMode,
     state.selectedVar,
-    state.customTitle,
+    displayTitle,
     state.bgMode,
     {
       showChangePoints: state.showChangePoints,
@@ -693,7 +991,8 @@ function updateResultTableDisplay(force = false) {
     ensureAllDecompositions,
     currentAnalytics,
     state.valueCols.length > 1,
-    state.valueCols
+    state.valueCols,
+    { groupCol: state.groupCol, selectedGroup: state.selectedGroup }
   );
 }
 
@@ -764,7 +1063,11 @@ function updateSummaryStats() {
   const seasonalRatio = effectiveSeasonalVariation / totalVar;
 
   let comment = `<strong>【分析のヒント】</strong><br><br>`;
-  
+
+  if (state.groupCol && state.selectedGroup) {
+    comment += `<strong>▪ 解析対象の観測点:</strong> <strong>${state.selectedGroup}</strong>（${state.groupCol}別集計）<br><br>`;
+  }
+
   if (state.model === 'auto' && res._autoDetected) {
     const modelName = res._autoDetected === 'multiplicative' ? '乗法モデル' : '加法モデル';
     comment += `<strong>▪ 自動判定モデル: ${modelName}</strong><br>加法モデルと乗法モデルの両方を比較し、より当てはまりの良い <strong>${modelName}</strong> を自動選択しました。<br><br>`;

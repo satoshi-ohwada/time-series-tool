@@ -55,7 +55,8 @@
 
           <!-- Demo Data Action -->
           <div class="demo-box">
-            <button id="loadDemoBtn" class="btn btn-ghost btn-block">✨ サンプルデータで試す (英国交通事故死傷者数)</button>
+            <button id="loadDemoBtn" class="btn btn-ghost btn-block">✨ サンプルデータで試す (単一系列)</button>
+            <button id="loadMultiSiteDemoBtn" class="btn btn-ghost btn-block btn-demo-secondary">📍 複数観測点サンプルで試す (3都市の気温)</button>
           </div>
         </section>
 
@@ -74,6 +75,38 @@
           <div class="form-group">
             <label for="timeColSelect">時間軸（日付・時刻）列</label>
             <select id="timeColSelect" class="form-control"></select>
+          </div>
+
+          <!-- Observation Point / Group Filtering Section -->
+          <div id="groupFilterSection" class="group-filter-section hidden">
+            <div id="duplicateAlertBadge" class="duplicate-alert-badge hidden">
+              <span class="alert-icon">⚠️</span>
+              <div class="alert-text">
+                <strong>同一日時の重複データを検知</strong>
+                <p>同一時点に複数観測点が含まれています。観測点を指定してください。</p>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="groupColSelect">観測点 / グループ列:
+                <span class="tooltip-icon" title="観測所、店舗、地域、IDなどのカテゴリ列を指定して個別に作図・解析します">ℹ️</span>
+              </label>
+              <select id="groupColSelect" class="form-control">
+                <option value="">なし (全体)</option>
+              </select>
+            </div>
+
+            <div id="groupValGroup" class="form-group hidden">
+              <div class="label-row">
+                <label for="groupValSelect">対象の観測点 (地点):</label>
+                <span id="groupTotalBadge" class="group-total-badge">全0地点</span>
+              </div>
+              <div class="group-select-nav">
+                <button type="button" id="prevSidebarGroupBtn" class="btn btn-sm btn-icon" title="前の観測点">◀</button>
+                <select id="groupValSelect" class="form-control"></select>
+                <button type="button" id="nextSidebarGroupBtn" class="btn btn-sm btn-icon" title="次の観測点">▶</button>
+              </div>
+            </div>
           </div>
 
           <div class="form-group">
@@ -181,6 +214,14 @@
               </select>
             </div>
 
+            <!-- Group / Observation Point Quick Switcher (Visible when group column selected) -->
+            <div id="graphGroupSwitcher" class="graph-group-switcher hidden">
+              <span class="switcher-label">📍 観測点:</span>
+              <button type="button" id="prevGraphGroupBtn" class="btn-icon-sm" title="前の観測点">◀</button>
+              <select id="graphGroupValSelect" class="form-control-select-sm"></select>
+              <button type="button" id="nextGraphGroupBtn" class="btn-icon-sm" title="次の観測点">▶</button>
+            </div>
+
             <!-- Annotation Toggles (Show / Hide on Graph) -->
             <div class="annotation-toggles">
               <label class="toggle-badge" id="changePointToggleLabel" title="トレンドの主な変曲点・ピーク・ボトムを図に表示/非表示">
@@ -267,6 +308,6 @@
   <script src="./lib/plotly.min.js"></script>
   <script src="./lib/xlsx.full.min.js"></script>
 
-  <script type="module" src="./src/main.js?v=29"></script>
+  <script type="module" src="./src/main.js?v=30"></script>
 </body>
 </html>

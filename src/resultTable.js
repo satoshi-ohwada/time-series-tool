@@ -1,7 +1,7 @@
 /**
  * STL Decomposition Result Table Viewer module
  */
-import { exportSingleVariableCSV, exportAllVariablesCSV } from './exporter.js?v=28';
+import { exportSingleVariableCSV, exportAllVariablesCSV } from './exporter.js?v=30';
 
 /**
  * Render STL decomposition calculation results as an interactive table
@@ -13,7 +13,7 @@ import { exportSingleVariableCSV, exportAllVariablesCSV } from './exporter.js?v=
  * @param {Object<string, object>} [allDecompositions] - All variables decompositions map
  * @param {object} [analyticsOptions] - { changePoints, cusumResult }
  */
-export function renderResultTable(containerId, timestamps, stlResult, varName, allDecompositions = {}, analyticsOptions = {}, hasMultipleVarsOverride = null, orderedVarNames = null) {
+export function renderResultTable(containerId, timestamps, stlResult, varName, allDecompositions = {}, analyticsOptions = {}, hasMultipleVarsOverride = null, orderedVarNames = null, groupOptions = {}) {
   const container = document.getElementById(containerId);
   if (!container) return;
 
@@ -21,6 +21,9 @@ export function renderResultTable(containerId, timestamps, stlResult, varName, a
     container.innerHTML = '<div class="empty-state"><p>計算結果がありません。データを読み込んでSTL分解を実行してください。</p></div>';
     return;
   }
+
+  const { groupCol = '', selectedGroup = '' } = groupOptions;
+  const hasGroup = !!(groupCol && selectedGroup);
 
   const { observed, trend, seasonal, residual } = stlResult;
   let adjusted = stlResult.adjusted;
@@ -51,6 +54,7 @@ export function renderResultTable(containerId, timestamps, stlResult, varName, a
     <div class="result-table-toolbar">
       <div class="result-info">
         <span class="result-tag">対象変数: <strong>${escapeHtml(varName)}</strong></span>
+        ${hasGroup ? `<span class="result-tag" style="background: rgba(56, 189, 248, 0.15); border-color: rgba(56, 189, 248, 0.4); color: var(--accent-blue);">📍 観測点: <strong>${escapeHtml(selectedGroup)}</strong></span>` : ''}
         <span class="result-count">全 <strong>${timestamps.length}</strong> 行の計算結果</span>
       </div>
       <div class="result-export-group">
@@ -64,6 +68,7 @@ export function renderResultTable(containerId, timestamps, stlResult, varName, a
           <tr>
             <th class="row-num-col">#</th>
             <th>日時 (Time)</th>
+            ${hasGroup ? `<th>${escapeHtml(groupCol || '観測点')}</th>` : ''}
             <th>元データ (Observed)</th>
             <th>トレンド (Trend)</th>
             <th>周期変動 (Seasonal)</th>
@@ -100,6 +105,7 @@ export function renderResultTable(containerId, timestamps, stlResult, varName, a
       <tr class="${cp ? 'row-has-cp' : ''} ${isCusumAlert ? 'row-has-cusum' : ''}">
         <td class="row-num-col">${i + 1}</td>
         <td><strong>${escapeHtml(timestamps[i])}</strong></td>
+        ${hasGroup ? `<td><span class="badge-group">${escapeHtml(selectedGroup)}</span></td>` : ''}
         <td class="num-cell val-observed">${obs}</td>
         <td class="num-cell val-trend">${trd}</td>
         <td class="num-cell val-seasonal">${sea}</td>
@@ -122,7 +128,7 @@ export function renderResultTable(containerId, timestamps, stlResult, varName, a
   const downloadBtn = container.querySelector('#downloadResultTableCsvBtn');
   if (downloadBtn) {
     downloadBtn.addEventListener('click', () => {
-      exportSingleVariableCSV(timestamps, stlResult, varName, analyticsOptions);
+      exportSingleVariableCSV(timestamps, stlResult, varName, analyticsOptions, groupOptions);
     });
   }
 
@@ -132,7 +138,7 @@ export function renderResultTable(containerId, timestamps, stlResult, varName, a
       const resolvedDecompositions = typeof allDecompositions === 'function'
         ? allDecompositions()
         : allDecompositions;
-      exportAllVariablesCSV(timestamps, resolvedDecompositions, orderedVarNames);
+      exportAllVariablesCSV(timestamps, resolvedDecompositions, orderedVarNames, groupOptions);
     });
   }
 }
