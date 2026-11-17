@@ -12,14 +12,14 @@ import {
   checkDuplicateTimestamps,
   detectGroupColumns,
   getUniqueGroupValues
-} from './parser.js?v=30';
-import { stlDecompose } from './stl.js?v=30';
-import { detectTrendChangePoints } from './changePoint.js?v=30';
-import { calculateResidualCusum } from './cusum.js?v=30';
-import { renderChart, downloadChartImage } from './chart.js?v=30';
-import { exportSingleVariableCSV, exportAllVariablesCSV } from './exporter.js?v=30';
-import { renderTableEditor } from './tableEditor.js?v=30';
-import { renderResultTable } from './resultTable.js?v=30';
+} from './parser.js?v=31';
+import { stlDecompose } from './stl.js?v=31';
+import { detectTrendChangePoints } from './changePoint.js?v=31';
+import { calculateResidualCusum } from './cusum.js?v=31';
+import { renderChart, downloadChartImage } from './chart.js?v=31';
+import { exportSingleVariableCSV, exportAllVariablesCSV } from './exporter.js?v=31';
+import { renderTableEditor } from './tableEditor.js?v=31';
+import { renderResultTable } from './resultTable.js?v=31';
 
 const state = {
   rawRows: [],
@@ -74,6 +74,12 @@ const graphGroupSwitcher = document.getElementById('graphGroupSwitcher');
 const graphGroupValSelect = document.getElementById('graphGroupValSelect');
 const prevGraphGroupBtn = document.getElementById('prevGraphGroupBtn');
 const nextGraphGroupBtn = document.getElementById('nextGraphGroupBtn');
+
+// Variable (Value) Quick Switcher on Graph Header
+const graphVarSwitcher = document.getElementById('graphVarSwitcher');
+const graphVarValSelect = document.getElementById('graphVarValSelect');
+const prevGraphVarBtn = document.getElementById('prevGraphVarBtn');
+const nextGraphVarBtn = document.getElementById('nextGraphVarBtn');
 
 const showGraphModeBtn = document.getElementById('showGraphModeBtn');
 const showResultModeBtn = document.getElementById('showResultModeBtn');
@@ -245,18 +251,21 @@ function initEventListeners() {
   });
 
   valueColSelect.addEventListener('change', (e) => {
-    state.selectedVar = e.target.value;
-    if (!state.decompositions[state.selectedVar]) {
-      runDecompositionForSelectedVar();
-    } else {
-      if (state.decompositions[state.selectedVar]?.timestamps) {
-        state.timestamps = state.decompositions[state.selectedVar].timestamps;
-      }
-      updateChartDisplay();
-      updateResultTableDisplay();
-      updateSummaryStats();
-    }
+    setTargetVariable(e.target.value);
   });
+
+  if (graphVarValSelect) {
+    graphVarValSelect.addEventListener('change', (e) => {
+      setTargetVariable(e.target.value);
+    });
+  }
+
+  if (prevGraphVarBtn) {
+    prevGraphVarBtn.addEventListener('click', () => navigateTargetVariable(-1));
+  }
+  if (nextGraphVarBtn) {
+    nextGraphVarBtn.addEventListener('click', () => navigateTargetVariable(1));
+  }
 
   // Period Settings & Auto Detect
   let periodDebounceTimer = null;
@@ -527,6 +536,40 @@ function navigateObservationGroup(delta) {
   }
 }
 
+function setTargetVariable(varName) {
+  if (!varName || !state.valueCols.includes(varName)) return;
+  state.selectedVar = varName;
+  if (valueColSelect) valueColSelect.value = varName;
+  if (graphVarValSelect) graphVarValSelect.value = varName;
+
+  const currentIdx = state.valueCols.indexOf(varName);
+  const isFirst = currentIdx <= 0;
+  const isLast = currentIdx >= state.valueCols.length - 1;
+
+  if (prevGraphVarBtn) prevGraphVarBtn.disabled = isFirst;
+  if (nextGraphVarBtn) nextGraphVarBtn.disabled = isLast;
+
+  if (!state.decompositions[state.selectedVar]) {
+    runDecompositionForSelectedVar();
+  } else {
+    if (state.decompositions[state.selectedVar]?.timestamps) {
+      state.timestamps = state.decompositions[state.selectedVar].timestamps;
+    }
+    updateChartDisplay();
+    updateResultTableDisplay();
+    updateSummaryStats();
+  }
+}
+
+function navigateTargetVariable(delta) {
+  if (!state.valueCols.length) return;
+  const currentIdx = state.valueCols.indexOf(state.selectedVar);
+  const newIdx = currentIdx + delta;
+  if (newIdx >= 0 && newIdx < state.valueCols.length) {
+    setTargetVariable(state.valueCols[newIdx]);
+  }
+}
+
 function switchMainMode(mode) {
   state.mainMode = mode;
 
@@ -692,7 +735,7 @@ function updateGroupValueSelects() {
 
   if (groupValGroup) groupValGroup.classList.remove('hidden');
   if (graphGroupSwitcher) graphGroupSwitcher.classList.remove('hidden');
-  if (groupTotalBadge) groupTotalBadge.textContent = `全 ${state.availableGroups.length} 地点`;
+  if (groupTotalBadge) groupTotalBadge.textContent = `全 ${state.availableGroups.length} 系列`;
 
   // Preserve selected group if still valid, otherwise default to first
   if (!state.availableGroups.some(g => g.value === state.selectedGroup)) {
@@ -746,13 +789,29 @@ function populateSelects() {
   });
 
   valueColSelect.innerHTML = '';
+  if (graphVarValSelect) graphVarValSelect.innerHTML = '';
+
   state.valueCols.forEach(key => {
     const opt = document.createElement('option');
     opt.value = key;
     opt.textContent = key;
     if (key === state.selectedVar) opt.selected = true;
     valueColSelect.appendChild(opt);
+
+    if (graphVarValSelect) {
+      const gOpt = document.createElement('option');
+      gOpt.value = key;
+      gOpt.textContent = key;
+      if (key === state.selectedVar) gOpt.selected = true;
+      graphVarValSelect.appendChild(gOpt);
+    }
   });
+
+  const currentIdx = state.valueCols.indexOf(state.selectedVar);
+  const isFirst = currentIdx <= 0;
+  const isLast = currentIdx >= state.valueCols.length - 1;
+  if (prevGraphVarBtn) prevGraphVarBtn.disabled = isFirst;
+  if (nextGraphVarBtn) nextGraphVarBtn.disabled = isLast;
 }
 
 // On-demand decomposition for single variable with caching
@@ -1065,7 +1124,7 @@ function updateSummaryStats() {
   let comment = `<strong>【分析のヒント】</strong><br><br>`;
 
   if (state.groupCol && state.selectedGroup) {
-    comment += `<strong>▪ 解析対象の観測点:</strong> <strong>${state.selectedGroup}</strong>（${state.groupCol}別集計）<br><br>`;
+    comment += `<strong>▪ 解析対象の系列 / グループ:</strong> <strong>${state.selectedGroup}</strong>（${state.groupCol}別）<br><br>`;
   }
 
   if (state.model === 'auto' && res._autoDetected) {

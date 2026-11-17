@@ -24,7 +24,7 @@ export function exportSingleVariableCSV(timestamps, stlResult, varName, analytic
 
   const headerCols = ['日付'];
   if (hasGroup) {
-    headerCols.push(groupCol || '観測点');
+    headerCols.push(groupCol || '系列');
   }
   headerCols.push(
     `${varName}_元データ`,
@@ -108,7 +108,7 @@ export function exportAllVariablesCSV(timestamps, allDecompositions, orderedVarN
 
   const headerCols = ['日付'];
   if (hasGroup) {
-    headerCols.push(groupCol || '観測点');
+    headerCols.push(groupCol || '系列');
   }
   varNames.forEach(varName => {
     headerCols.push(

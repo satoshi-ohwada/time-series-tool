@@ -53,10 +53,13 @@
             <button id="applyPasteBtn" class="btn btn-primary btn-block">貼り付けデータを読み込む</button>
           </div>
 
-          <!-- Demo Data Action -->
-          <div class="demo-box">
-            <button id="loadDemoBtn" class="btn btn-ghost btn-block">✨ サンプルデータで試す (単一系列)</button>
-            <button id="loadMultiSiteDemoBtn" class="btn btn-ghost btn-block btn-demo-secondary">📍 複数観測点サンプルで試す (3都市の気温)</button>
+          <!-- Demo Data Action (Compact) -->
+          <div class="demo-box-compact">
+            <span class="demo-label">✨ サンプル:</span>
+            <div class="demo-btn-group">
+              <button type="button" id="loadDemoBtn" class="btn btn-xs btn-ghost" title="単一系列データ (交通事故死傷者数)">単系列</button>
+              <button type="button" id="loadMultiSiteDemoBtn" class="btn btn-xs btn-ghost btn-demo-secondary" title="複数系列データ (3地点の月別気温推移)">複数系列</button>
+            </div>
           </div>
         </section>
 
@@ -67,51 +70,48 @@
             <h2>解析設定</h2>
           </div>
 
-          <div class="form-group">
-            <label for="customTitleInput">グラフタイトル (任意)</label>
-            <input type="text" id="customTitleInput" class="form-control" placeholder="例: 2021-2024年度 売上高トレンド分析">
-          </div>
-
-          <div class="form-group">
+          <div class="form-group form-group-compact">
             <label for="timeColSelect">時間軸（日付・時刻）列</label>
             <select id="timeColSelect" class="form-control"></select>
           </div>
 
-          <!-- Observation Point / Group Filtering Section -->
+          <!-- Series / Group Filtering Section (Compact) -->
           <div id="groupFilterSection" class="group-filter-section hidden">
-            <div id="duplicateAlertBadge" class="duplicate-alert-badge hidden">
+            <div id="duplicateAlertBadge" class="duplicate-alert-badge-compact hidden">
               <span class="alert-icon">⚠️</span>
-              <div class="alert-text">
-                <strong>同一日時の重複データを検知</strong>
-                <p>同一時点に複数観測点が含まれています。観測点を指定してください。</p>
-              </div>
+              <span class="alert-text">重複日時を検知（系列を指定して解析）</span>
             </div>
 
-            <div class="form-group">
-              <label for="groupColSelect">観測点 / グループ列:
-                <span class="tooltip-icon" title="観測所、店舗、地域、IDなどのカテゴリ列を指定して個別に作図・解析します">ℹ️</span>
+            <div class="form-group form-group-compact">
+              <label for="groupColSelect">系列 / グループ列:
+                <span class="tooltip-icon" title="店舗、商品、地域、観測所、IDなどのカテゴリ列を指定して個別に作図・解析します">ℹ️</span>
               </label>
               <select id="groupColSelect" class="form-control">
                 <option value="">なし (全体)</option>
               </select>
             </div>
 
-            <div id="groupValGroup" class="form-group hidden">
+            <div id="groupValGroup" class="form-group form-group-compact hidden">
               <div class="label-row">
-                <label for="groupValSelect">対象の観測点 (地点):</label>
-                <span id="groupTotalBadge" class="group-total-badge">全0地点</span>
+                <label for="groupValSelect">対象系列 / グループ:</label>
+                <span id="groupTotalBadge" class="group-total-badge">全0系列</span>
               </div>
               <div class="group-select-nav">
-                <button type="button" id="prevSidebarGroupBtn" class="btn btn-sm btn-icon" title="前の観測点">◀</button>
+                <button type="button" id="prevSidebarGroupBtn" class="btn btn-sm btn-icon" title="前の系列">◀</button>
                 <select id="groupValSelect" class="form-control"></select>
-                <button type="button" id="nextSidebarGroupBtn" class="btn btn-sm btn-icon" title="次の観測点">▶</button>
+                <button type="button" id="nextSidebarGroupBtn" class="btn btn-sm btn-icon" title="次の系列">▶</button>
               </div>
             </div>
           </div>
 
-          <div class="form-group">
+          <div class="form-group form-group-compact">
             <label for="valueColSelect">解析対象の変数 (Value)</label>
             <select id="valueColSelect" class="form-control"></select>
+          </div>
+
+          <div class="form-group form-group-compact">
+            <label for="customTitleInput">グラフタイトル (任意)</label>
+            <input type="text" id="customTitleInput" class="form-control" placeholder="例: 2021-2024年度 売上高トレンド分析">
           </div>
 
           <div class="form-group">
@@ -200,50 +200,60 @@
         <!-- View Mode & Styling Navigation Bar (For Graph) -->
         <div id="graphControlsBar" class="view-tabs-bar">
           <div class="tabs-header-row">
-            <div class="view-mode-selector">
-              <label for="viewModeSelect">📊 表示切替:</label>
-              <select id="viewModeSelect" class="form-control-select">
-                <option value="overlay" selected>元データ と トレンド</option>
-                <option value="adjusted">元データ と 周期調整済データ</option>
-                <option value="decomposition">4成分分解 (Subplots)</option>
-                <option value="observed">元データのみ</option>
-                <option value="trend">トレンドのみ</option>
-                <option value="seasonal">周期変動のみ</option>
-                <option value="residual">残差のみ</option>
-                <option value="cusum">残差 CUSUM 管理図 (累積和法)</option>
-              </select>
+            <!-- Navigation Switchers: Group & Variable (Primary Actions) -->
+            <div class="nav-switchers-group">
+              <!-- Group / Series Quick Switcher (Visible when group column selected) -->
+              <div id="graphGroupSwitcher" class="graph-nav-switcher hidden">
+                <span class="switcher-label">🏷️ 系列:</span>
+                <button type="button" id="prevGraphGroupBtn" class="btn-icon-sm" title="前の系列">◀</button>
+                <select id="graphGroupValSelect" class="form-control-select-sm"></select>
+                <button type="button" id="nextGraphGroupBtn" class="btn-icon-sm" title="次の系列">▶</button>
+              </div>
+
+              <!-- Variable (Value) Quick Switcher -->
+              <div id="graphVarSwitcher" class="graph-nav-switcher">
+                <span class="switcher-label">📈 変数:</span>
+                <button type="button" id="prevGraphVarBtn" class="btn-icon-sm" title="前の変数">◀</button>
+                <select id="graphVarValSelect" class="form-control-select-sm"></select>
+                <button type="button" id="nextGraphVarBtn" class="btn-icon-sm" title="次の変数">▶</button>
+              </div>
             </div>
 
-            <!-- Group / Observation Point Quick Switcher (Visible when group column selected) -->
-            <div id="graphGroupSwitcher" class="graph-group-switcher hidden">
-              <span class="switcher-label">📍 観測点:</span>
-              <button type="button" id="prevGraphGroupBtn" class="btn-icon-sm" title="前の観測点">◀</button>
-              <select id="graphGroupValSelect" class="form-control-select-sm"></select>
-              <button type="button" id="nextGraphGroupBtn" class="btn-icon-sm" title="次の観測点">▶</button>
-            </div>
-
-            <!-- Annotation Toggles (Show / Hide on Graph) -->
-            <div class="annotation-toggles">
-              <label class="toggle-badge" id="changePointToggleLabel" title="トレンドの主な変曲点・ピーク・ボトムを図に表示/非表示">
-                <input type="checkbox" id="showChangePointsCheck" checked>
-                <span>📍 変化点を表示</span>
-              </label>
-              <label class="toggle-badge" id="cusumAlertToggleLabel" title="残差の持続的な偏り（CUSUM異常シフト区間）を図に表示/非表示">
-                <input type="checkbox" id="showCusumAlertsCheck">
-                <span>⚠️ CUSUM異常を表示</span>
-              </label>
-            </div>
-
-            <div class="chart-options">
-              <div class="bg-option">
-                <label for="bgColorSelect">背景:</label>
-                <select id="bgColorSelect" class="form-control-sm">
-                  <option value="transparent">透明 (資料埋め込み用)</option>
-                  <option value="white">白 (資料印刷・資料標準)</option>
-                  <option value="dark" selected>ダーク (画面用)</option>
+            <!-- Graph Options: View Mode, Toggles, Styling (Secondary Actions) -->
+            <div class="chart-secondary-options">
+              <div class="view-mode-selector">
+                <select id="viewModeSelect" class="form-control-select-sm" title="表示モード切替">
+                  <option value="overlay" selected>元データ ＆ トレンド</option>
+                  <option value="adjusted">元データ ＆ 周期調整済</option>
+                  <option value="decomposition">4成分分解 (Subplots)</option>
+                  <option value="observed">元データのみ</option>
+                  <option value="trend">トレンドのみ</option>
+                  <option value="seasonal">周期変動のみ</option>
+                  <option value="residual">残差のみ</option>
+                  <option value="cusum">残差 CUSUM 管理図</option>
                 </select>
               </div>
-              <button id="downloadImageBtn" class="btn btn-sm btn-primary">🖼️ グラフ画像を保存 (PNG)</button>
+
+              <!-- Annotation Toggles (Show / Hide on Graph) -->
+              <div class="annotation-toggles">
+                <label class="toggle-badge-sm" id="changePointToggleLabel" title="トレンド変化点を表示/非表示">
+                  <input type="checkbox" id="showChangePointsCheck" checked>
+                  <span>📍 変化点</span>
+                </label>
+                <label class="toggle-badge-sm" id="cusumAlertToggleLabel" title="残差CUSUM異常シフト区間を表示/非表示">
+                  <input type="checkbox" id="showCusumAlertsCheck">
+                  <span>⚠️ CUSUM</span>
+                </label>
+              </div>
+
+              <div class="chart-options-compact">
+                <select id="bgColorSelect" class="form-control-select-xs" title="グラフ背景色">
+                  <option value="dark" selected>🎨 ダーク</option>
+                  <option value="white">🎨 白</option>
+                  <option value="transparent">🎨 透明</option>
+                </select>
+                <button id="downloadImageBtn" class="btn btn-xs btn-primary" title="グラフ画像をPNG保存">🖼️ 保存</button>
+              </div>
             </div>
           </div>
         </div>
@@ -308,6 +318,6 @@
   <script src="./lib/plotly.min.js"></script>
   <script src="./lib/xlsx.full.min.js"></script>
 
-  <script type="module" src="./src/main.js?v=30"></script>
+  <script type="module" src="./src/main.js?v=31"></script>
 </body>
 </html>

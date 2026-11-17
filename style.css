@@ -505,17 +505,18 @@ body {
   position: relative;
   z-index: 1;
   width: 100%;
-  aspect-ratio: 16 / 9;
-  min-height: 400px; /* 極端に小さくなるのを防ぐため */
+  flex: 1;
+  min-height: 380px;
+  max-height: calc(100vh - 130px);
   display: flex;
   flex-direction: column;
   overflow: hidden;
 }
 
 .chart-wrapper.mode-decomposition {
-  aspect-ratio: auto;
-  min-height: 680px;
-  height: 700px;
+  min-height: 600px;
+  max-height: none;
+  height: auto;
 }
 
 .chart-container {
@@ -854,45 +855,75 @@ body {
   margin-top: 0.5rem;
 }
 
-/* Observation Point / Group Filtering */
+/* Compact Form Group & Alerts */
+.form-group-compact {
+  margin-bottom: 0.55rem;
+}
+
+.demo-box-compact {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+  padding: 0.35rem 0.5rem;
+  background: rgba(15, 23, 42, 0.5);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  margin-top: 0.35rem;
+}
+
+.demo-box-compact .demo-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-sub);
+  white-space: nowrap;
+}
+
+.demo-btn-group {
+  display: flex;
+  gap: 0.3rem;
+}
+
+.btn-xs {
+  padding: 0.2rem 0.5rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  border-radius: 4px;
+}
+
+.duplicate-alert-badge-compact {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  border-radius: 4px;
+  padding: 0.25rem 0.45rem;
+  margin-bottom: 0.45rem;
+  font-size: 0.72rem;
+  color: #fbbf24;
+  line-height: 1.2;
+}
+
+.duplicate-alert-badge-compact .alert-icon {
+  font-size: 0.85rem;
+  flex-shrink: 0;
+}
+
+.duplicate-alert-badge-compact .alert-text {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Series / Group Filtering */
 .group-filter-section {
   background: rgba(15, 23, 42, 0.45);
   border: 1px solid rgba(56, 189, 248, 0.25);
   border-radius: var(--radius-md);
-  padding: 0.75rem;
-  margin-bottom: 0.75rem;
+  padding: 0.5rem;
+  margin-bottom: 0.55rem;
   transition: all 0.3s ease;
-}
-
-.duplicate-alert-badge {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.5rem;
-  background: rgba(245, 158, 11, 0.15);
-  border: 1px solid rgba(245, 158, 11, 0.4);
-  border-radius: var(--radius-md);
-  padding: 0.55rem 0.65rem;
-  margin-bottom: 0.65rem;
-  animation: fadeIn 0.3s ease;
-}
-
-.duplicate-alert-badge .alert-icon {
-  font-size: 1.1rem;
-  line-height: 1.2;
-}
-
-.duplicate-alert-badge .alert-text strong {
-  display: block;
-  font-size: 0.8rem;
-  color: #fbbf24;
-  margin-bottom: 0.15rem;
-}
-
-.duplicate-alert-badge .alert-text p {
-  font-size: 0.72rem;
-  color: #fde68a;
-  line-height: 1.35;
-  margin: 0;
 }
 
 .group-total-badge {
@@ -940,27 +971,67 @@ body {
 .btn-demo-secondary {
   border-color: rgba(56, 189, 248, 0.3) !important;
   color: var(--accent-blue) !important;
-  margin-top: 0.4rem;
 }
 
 .btn-demo-secondary:hover {
   background: rgba(56, 189, 248, 0.12) !important;
 }
 
-/* Graph Header Quick Switcher */
-.graph-group-switcher {
+/* Graph Header Navigation Switchers & Controls Bar */
+.view-tabs-bar {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: 0.35rem 0.6rem;
+  box-shadow: var(--shadow-lg);
+  position: relative;
+  z-index: 10;
+  flex-shrink: 0;
+}
+
+.tabs-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  position: relative;
+  z-index: 51;
+}
+
+.nav-switchers-group {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+}
+
+.graph-nav-switcher {
   display: inline-flex;
   align-items: center;
-  gap: 0.35rem;
-  background: rgba(15, 23, 42, 0.6);
+  gap: 0.25rem;
+  background: rgba(15, 23, 42, 0.65);
   border: 1px solid rgba(56, 189, 248, 0.35);
-  padding: 0.25rem 0.6rem;
+  padding: 0.18rem 0.45rem;
   border-radius: var(--radius-md);
 }
 
+.chart-secondary-options {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.chart-options-compact {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
 .switcher-label {
-  font-size: 0.8rem;
-  font-weight: 600;
+  font-size: 0.78rem;
+  font-weight: 700;
   color: var(--accent-blue);
   white-space: nowrap;
 }
@@ -970,8 +1041,8 @@ body {
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
   color: #f8fafc;
-  padding: 0.25rem 0.5rem;
-  font-size: 0.82rem;
+  padding: 0.2rem 0.4rem;
+  font-size: 0.8rem;
   font-weight: 600;
   cursor: pointer;
   outline: none;
@@ -982,13 +1053,29 @@ body {
   border-color: var(--accent-blue);
 }
 
+.form-control-select-xs {
+  background: var(--bg-dark);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  color: var(--text-sub);
+  padding: 0.18rem 0.35rem;
+  font-size: 0.74rem;
+  cursor: pointer;
+  outline: none;
+}
+
+.form-control-select-xs:focus, .form-control-select-xs:hover {
+  color: var(--text-main);
+  border-color: var(--accent-blue);
+}
+
 .btn-icon-sm {
   background: transparent;
   border: 1px solid var(--border-color);
   color: var(--text-sub);
-  border-radius: var(--radius-md);
-  padding: 0.2rem 0.4rem;
-  font-size: 0.72rem;
+  border-radius: 4px;
+  padding: 0.15rem 0.35rem;
+  font-size: 0.68rem;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
@@ -1006,6 +1093,53 @@ body {
   opacity: 0.3;
   cursor: not-allowed;
   pointer-events: none;
+}
+
+.toggle-badge-sm {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.74rem;
+  font-weight: 500;
+  padding: 0.18rem 0.45rem;
+  border-radius: 12px;
+  border: 1px solid var(--border-color);
+  background: rgba(15, 23, 42, 0.4);
+  color: var(--text-sub);
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.toggle-badge-sm input[type="checkbox"] {
+  accent-color: var(--accent-blue);
+  width: 13px;
+  height: 13px;
+}
+
+.toggle-badge-sm:has(input[type="checkbox"]:checked) {
+  background: rgba(56, 189, 248, 0.12);
+  border-color: var(--accent-blue);
+  color: var(--text-main);
+}
+
+#cusumAlertToggleLabel:has(input[type="checkbox"]:checked) {
+  background: rgba(244, 63, 94, 0.12);
+  border-color: var(--accent-pink);
+  box-shadow: 0 0 6px rgba(244, 63, 94, 0.2);
+}
+
+/* Responsive adjustments for smaller screens */
+@media (max-height: 800px) {
+  .chart-wrapper {
+    min-height: 320px;
+    max-height: calc(100vh - 100px);
+  }
+  .app-container {
+    padding: 0.4rem 0.6rem;
+    gap: 0.4rem;
+  }
 }
 
 

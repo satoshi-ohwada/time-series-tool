@@ -1,7 +1,7 @@
 /**
  * STL Decomposition Result Table Viewer module
  */
-import { exportSingleVariableCSV, exportAllVariablesCSV } from './exporter.js?v=30';
+import { exportSingleVariableCSV, exportAllVariablesCSV } from './exporter.js?v=31';
 
 /**
  * Render STL decomposition calculation results as an interactive table
@@ -54,7 +54,7 @@ export function renderResultTable(containerId, timestamps, stlResult, varName, a
     <div class="result-table-toolbar">
       <div class="result-info">
         <span class="result-tag">対象変数: <strong>${escapeHtml(varName)}</strong></span>
-        ${hasGroup ? `<span class="result-tag" style="background: rgba(56, 189, 248, 0.15); border-color: rgba(56, 189, 248, 0.4); color: var(--accent-blue);">📍 観測点: <strong>${escapeHtml(selectedGroup)}</strong></span>` : ''}
+        ${hasGroup ? `<span class="result-tag" style="background: rgba(56, 189, 248, 0.15); border-color: rgba(56, 189, 248, 0.4); color: var(--accent-blue);">🏷️ 系列: <strong>${escapeHtml(selectedGroup)}</strong></span>` : ''}
         <span class="result-count">全 <strong>${timestamps.length}</strong> 行の計算結果</span>
       </div>
       <div class="result-export-group">
@@ -68,7 +68,7 @@ export function renderResultTable(containerId, timestamps, stlResult, varName, a
           <tr>
             <th class="row-num-col">#</th>
             <th>日時 (Time)</th>
-            ${hasGroup ? `<th>${escapeHtml(groupCol || '観測点')}</th>` : ''}
+            ${hasGroup ? `<th>${escapeHtml(groupCol || '系列')}</th>` : ''}
             <th>元データ (Observed)</th>
             <th>トレンド (Trend)</th>
             <th>周期変動 (Seasonal)</th>
