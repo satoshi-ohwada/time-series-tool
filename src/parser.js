@@ -205,8 +205,10 @@ export function detectGroupColumns(rows, timeCol, valueCols = []) {
   const groupKeywords = [
     '観測', '地点', '場所', '測候所', 'ステーション', 'station', 'point', 'loc', 'location', 'site',
     '店舗', '店', '支店', '支社', '拠点', 'store', 'shop', 'branch',
-    'グループ', 'group', 'カテゴリ', 'category', 'クラス', 'class',
+    'グループ', 'group', 'カテゴリ', 'category', 'クラス', 'class', 'セグメント', 'segment',
     '地域', '地区', 'エリア', 'area', 'region', '都道府県', '県', '市', '区',
+    '品目', '商品', '銘柄', 'item', 'product', 'sku',
+    '部門', '組織', 'dept', 'department', 'team',
     'id', 'コード', 'code', 'name', '名前', '名称', 'type', '種別'
   ];
 
@@ -215,8 +217,10 @@ export function detectGroupColumns(rows, timeCol, valueCols = []) {
   for (const col of nonTimeCols) {
     const valSet = new Set();
     const sampleLimit = Math.min(rows.length, 1000);
+    const step = Math.max(1, Math.floor(rows.length / sampleLimit));
 
-    for (let i = 0; i < sampleLimit; i++) {
+    // Stride sampling across the entire dataset to capture groups ordered by category
+    for (let i = 0; i < rows.length; i += step) {
       const val = rows[i][col];
       if (val !== undefined && val !== null && val !== '') {
         valSet.add(String(val).trim());
@@ -601,11 +605,17 @@ export function extractTimeSeries(rows, timeCol, valueCol, groupCol = null, sele
   });
 
   // Ensure points are sorted chronologically if date formats are parsable
+  // Cache parsed timestamp millisecond values to avoid O(N log N) Date.parse calls during sort
+  for (let i = 0; i < points.length; i++) {
+    const t = Date.parse(points[i].timestamp);
+    points[i]._time = isNaN(t) ? null : t;
+  }
+
   let isChronological = true;
   for (let i = 1; i < points.length; i++) {
-    const prevD = Date.parse(points[i - 1].timestamp);
-    const currD = Date.parse(points[i].timestamp);
-    if (!isNaN(prevD) && !isNaN(currD) && prevD > currD) {
+    const prevD = points[i - 1]._time;
+    const currD = points[i]._time;
+    if (prevD !== null && currD !== null && prevD > currD) {
       isChronological = false;
       break;
     }
@@ -613,9 +623,9 @@ export function extractTimeSeries(rows, timeCol, valueCol, groupCol = null, sele
 
   if (!isChronological && points.length > 1) {
     points.sort((a, b) => {
-      const da = Date.parse(a.timestamp);
-      const db = Date.parse(b.timestamp);
-      if (!isNaN(da) && !isNaN(db)) return da - db;
+      const da = a._time;
+      const db = b._time;
+      if (da !== null && db !== null) return da - db;
       return a.timestamp.localeCompare(b.timestamp);
     });
   }

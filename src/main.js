@@ -12,14 +12,14 @@ import {
   checkDuplicateTimestamps,
   detectGroupColumns,
   getUniqueGroupValues
-} from './parser.js?v=31';
-import { stlDecompose } from './stl.js?v=31';
-import { detectTrendChangePoints } from './changePoint.js?v=31';
-import { calculateResidualCusum } from './cusum.js?v=31';
-import { renderChart, downloadChartImage } from './chart.js?v=32';
-import { exportSingleVariableCSV, exportAllVariablesCSV } from './exporter.js?v=31';
-import { renderTableEditor } from './tableEditor.js?v=31';
-import { renderResultTable } from './resultTable.js?v=31';
+} from './parser.js?v=33';
+import { stlDecompose } from './stl.js?v=33';
+import { detectTrendChangePoints } from './changePoint.js?v=33';
+import { calculateResidualCusum } from './cusum.js?v=33';
+import { renderChart, downloadChartImage } from './chart.js?v=33';
+import { exportSingleVariableCSV, exportAllVariablesCSV } from './exporter.js?v=33';
+import { renderTableEditor } from './tableEditor.js?v=33';
+import { renderResultTable } from './resultTable.js?v=33';
 
 const state = {
   rawRows: [],
@@ -37,6 +37,7 @@ const state = {
   viewMode: 'overlay',
   mainMode: 'graph', // 'graph' | 'result' | 'table'
   resultTableDirty: true,
+  tableEditorDirty: true,
   customTitle: '',
   bgMode: 'dark', // 'dark' | 'white' | 'transparent'
   enableInterpolation: true,
@@ -596,11 +597,19 @@ function switchMainMode(mode) {
   } else if (mode === 'table') {
     showTableModeBtn.classList.add('active');
     tableEditorContainer.classList.remove('hidden');
-    updateTableEditorDisplay();
+    if (state.tableEditorDirty) {
+      updateTableEditorDisplay(true);
+    }
   }
 }
 
-function updateTableEditorDisplay() {
+function updateTableEditorDisplay(force = false) {
+  if (state.mainMode !== 'table' && !force) {
+    state.tableEditorDirty = true;
+    return;
+  }
+  state.tableEditorDirty = false;
+
   if (state.rawRows && state.rawRows.length > 0) {
     renderTableEditor('tableEditorContainer', state.rawRows, (updatedRows) => {
       state.rawRows = updatedRows;
