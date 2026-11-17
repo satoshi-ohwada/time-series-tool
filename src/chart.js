@@ -93,7 +93,7 @@ export function renderChart(
     plot_bgcolor: plotBg,
     font: { color: palette.text, family: 'Inter, "Noto Sans JP", sans-serif' },
     hoverlabel: commonHoverLabel,
-    margin: { t: 90, r: 30, l: 65, b: 65 },
+    margin: { t: 60, r: 25, l: 60, b: 55 },
     hovermode: 'x unified',
     autosize: true,
     showlegend: true,

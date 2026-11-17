@@ -16,7 +16,7 @@ import {
 import { stlDecompose } from './stl.js?v=31';
 import { detectTrendChangePoints } from './changePoint.js?v=31';
 import { calculateResidualCusum } from './cusum.js?v=31';
-import { renderChart, downloadChartImage } from './chart.js?v=31';
+import { renderChart, downloadChartImage } from './chart.js?v=32';
 import { exportSingleVariableCSV, exportAllVariablesCSV } from './exporter.js?v=31';
 import { renderTableEditor } from './tableEditor.js?v=31';
 import { renderResultTable } from './resultTable.js?v=31';

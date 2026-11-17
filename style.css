@@ -505,18 +505,17 @@ body {
   position: relative;
   z-index: 1;
   width: 100%;
-  flex: 1;
-  min-height: 380px;
-  max-height: calc(100vh - 130px);
+  aspect-ratio: 16 / 9;
+  min-height: 480px;
   display: flex;
   flex-direction: column;
   overflow: hidden;
 }
 
 .chart-wrapper.mode-decomposition {
-  min-height: 600px;
-  max-height: none;
-  height: auto;
+  aspect-ratio: auto;
+  min-height: 720px;
+  height: 740px;
 }
 
 .chart-container {
@@ -1132,10 +1131,6 @@ body {
 
 /* Responsive adjustments for smaller screens */
 @media (max-height: 800px) {
-  .chart-wrapper {
-    min-height: 320px;
-    max-height: calc(100vh - 100px);
-  }
   .app-container {
     padding: 0.4rem 0.6rem;
     gap: 0.4rem;
