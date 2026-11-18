@@ -22,18 +22,18 @@ export function exportSingleVariableCSV(timestamps, stlResult, varName, analytic
   const hasCusum = cusumResult && cusumResult.anomalyIndices;
   const hasGroup = !!(groupCol && selectedGroup);
 
-  const headerCols = ['日付'];
+  const headerCols = [formatCSVField('日付')];
   if (hasGroup) {
-    headerCols.push(groupCol || '系列');
+    headerCols.push(formatCSVField(groupCol || '系列'));
   }
   headerCols.push(
-    `${varName}_元データ`,
-    `${varName}_トレンド`,
-    `${varName}_周期変動`,
-    `${varName}_周期調整済`,
-    `${varName}_残差`,
-    `${varName}_トレンド変化点`,
-    `${varName}_CUSUM異常フラグ`
+    formatCSVField(`${varName}_元データ`),
+    formatCSVField(`${varName}_トレンド`),
+    formatCSVField(`${varName}_周期変動`),
+    formatCSVField(`${varName}_周期調整済`),
+    formatCSVField(`${varName}_残差`),
+    formatCSVField(`${varName}_トレンド変化点`),
+    formatCSVField(`${varName}_CUSUM異常フラグ`)
   );
 
   const rows = [headerCols.join(',')];
@@ -106,17 +106,17 @@ export function exportAllVariablesCSV(timestamps, allDecompositions, orderedVarN
     return a.localeCompare(b);
   });
 
-  const headerCols = ['日付'];
+  const headerCols = [formatCSVField('日付')];
   if (hasGroup) {
-    headerCols.push(groupCol || '系列');
+    headerCols.push(formatCSVField(groupCol || '系列'));
   }
   varNames.forEach(varName => {
     headerCols.push(
-      `${varName}_元データ`,
-      `${varName}_トレンド`,
-      `${varName}_周期変動`,
-      `${varName}_周期調整済`,
-      `${varName}_残差`
+      formatCSVField(`${varName}_元データ`),
+      formatCSVField(`${varName}_トレンド`),
+      formatCSVField(`${varName}_周期変動`),
+      formatCSVField(`${varName}_周期調整済`),
+      formatCSVField(`${varName}_残差`)
     );
   });
   const rows = [headerCols.join(',')];
@@ -166,15 +166,34 @@ export function exportAllVariablesCSV(timestamps, allDecompositions, orderedVarN
 }
 
 function formatCSVField(field) {
-  const str = String(field !== undefined && field !== null ? field : '');
-  if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+  let str = String(field !== undefined && field !== null ? field : '');
+
+  // Guard against CSV Formula Injection (DDE / execution in Excel / Calc)
+  // If string starts with =, @, tab, newline, or (+ / - not forming a purely valid number)
+  if (typeof field !== 'number') {
+    const trimmed = str.trimStart();
+    if (trimmed.length > 0) {
+      const firstChar = trimmed[0];
+      if (
+        firstChar === '=' ||
+        firstChar === '@' ||
+        firstChar === '\t' ||
+        firstChar === '\r' ||
+        ((firstChar === '+' || firstChar === '-') && isNaN(Number(trimmed)))
+      ) {
+        str = "'" + str;
+      }
+    }
+  }
+
+  if (str.includes(',') || str.includes('"') || str.includes('\n') || str.includes('\r')) {
     return `"${str.replace(/"/g, '""')}"`;
   }
   return str;
 }
 
 function sanitizeFilename(filename) {
-  return filename.replace(/[/\\?%*:|"<>]/g, '_');
+  return String(filename || '').replace(/[/\\?%*:|"<>=\x00-\x1f]/g, '_').replace(/^\.+/, '');
 }
 
 function triggerDownload(content, filename) {

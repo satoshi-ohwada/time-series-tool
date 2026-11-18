@@ -1,7 +1,7 @@
 /**
  * STL Decomposition Result Table Viewer module
  */
-import { exportSingleVariableCSV, exportAllVariablesCSV } from './exporter.js?v=31';
+import { exportSingleVariableCSV, exportAllVariablesCSV } from './exporter.js?v=35';
 
 /**
  * Render STL decomposition calculation results as an interactive table
@@ -148,5 +148,6 @@ function escapeHtml(str) {
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }

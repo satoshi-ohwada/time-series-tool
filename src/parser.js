@@ -26,7 +26,7 @@ export function parsePastedText(text) {
     delimiter = ';';
   }
 
-  const headers = lines[0].split(delimiter).map(h => h.trim().replace(/^"|"$/g, ''));
+  const headers = lines[0].split(delimiter).map(h => sanitizeKey(h.trim().replace(/^"|"$/g, '')));
   const rows = [];
 
   for (let i = 1; i < lines.length; i++) {
@@ -40,6 +40,14 @@ export function parsePastedText(text) {
   }
 
   return rows;
+}
+
+function sanitizeKey(key) {
+  const k = String(key !== undefined && key !== null ? key : '').trim();
+  if (k === '__proto__' || k === 'constructor' || k === 'prototype') {
+    return '_' + k;
+  }
+  return k;
 }
 
 /**
@@ -82,7 +90,15 @@ export function parseFileBuffer(data, isText = false) {
 
   // Convert to JSON row objects
   const rawData = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
-  return rawData;
+  if (!Array.isArray(rawData)) return [];
+
+  return rawData.map(row => {
+    const safeRow = {};
+    for (const key of Object.keys(row)) {
+      safeRow[sanitizeKey(key)] = row[key];
+    }
+    return safeRow;
+  });
 }
 
 /**

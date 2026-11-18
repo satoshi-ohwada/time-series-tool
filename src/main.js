@@ -12,14 +12,14 @@ import {
   checkDuplicateTimestamps,
   detectGroupColumns,
   getUniqueGroupValues
-} from './parser.js?v=34';
-import { stlDecompose } from './stl.js?v=34';
-import { detectTrendChangePoints } from './changePoint.js?v=34';
-import { calculateResidualCusum } from './cusum.js?v=34';
-import { renderChart, downloadChartImage } from './chart.js?v=34';
-import { exportSingleVariableCSV, exportAllVariablesCSV } from './exporter.js?v=34';
-import { renderTableEditor } from './tableEditor.js?v=34';
-import { renderResultTable } from './resultTable.js?v=34';
+} from './parser.js?v=35';
+import { stlDecompose } from './stl.js?v=35';
+import { detectTrendChangePoints } from './changePoint.js?v=35';
+import { calculateResidualCusum } from './cusum.js?v=35';
+import { renderChart, downloadChartImage } from './chart.js?v=35';
+import { exportSingleVariableCSV, exportAllVariablesCSV } from './exporter.js?v=35';
+import { renderTableEditor } from './tableEditor.js?v=35';
+import { renderResultTable } from './resultTable.js?v=35';
 
 const state = {
   rawRows: [],
@@ -1403,7 +1403,7 @@ function updateSummaryStats() {
   let comment = `<strong>【分析のヒント】</strong><br><br>`;
 
   if (state.groupCol && state.selectedGroup) {
-    comment += `<strong>▪ 解析対象の系列 / グループ:</strong> <strong>${state.selectedGroup}</strong>（${state.groupCol}別）<br><br>`;
+    comment += `<strong>▪ 解析対象の系列 / グループ:</strong> <strong>${escapeHtml(state.selectedGroup)}</strong>（${escapeHtml(state.groupCol)}別）<br><br>`;
   }
 
   if (state.model === 'auto' && res._autoDetected) {
@@ -1448,7 +1448,7 @@ function updateSummaryStats() {
     if (currentAnalytics.changePoints && currentAnalytics.changePoints.length > 0) {
       comment += `<br><strong>▪ トレンドの主な変化点 (${currentAnalytics.changePoints.length}箇所検出)</strong><br>`;
       currentAnalytics.changePoints.forEach(cp => {
-        comment += `・<strong>${cp.timestamp}</strong>: 📍 ${cp.label}（${cp.description}）<br>`;
+        comment += `・<strong>${escapeHtml(cp.timestamp)}</strong>: 📍 ${escapeHtml(cp.label)}（${escapeHtml(cp.description)}）<br>`;
       });
     }
 
@@ -1460,7 +1460,7 @@ function updateSummaryStats() {
       if (cusumResult.hasAnomaly && cusumResult.anomalies.length > 0) {
         comment += `⚠️ <strong>管理限界超過（持続的なシフト）を検知しました:</strong><br>`;
         cusumResult.anomalies.forEach(anom => {
-          comment += `・${anom.description}<br>`;
+          comment += `・${escapeHtml(anom.description)}<br>`;
         });
         comment += `※ 一時的なノイズではなく、一定期間にわたる平均水準の偏り（構造変化や外生要因）を示唆しています。<br>`;
       } else {
@@ -1470,6 +1470,15 @@ function updateSummaryStats() {
   }
 
   document.getElementById('analysisComment').innerHTML = comment;
+}
+
+function escapeHtml(str) {
+  return String(str !== undefined && str !== null ? str : '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 // Initialize App

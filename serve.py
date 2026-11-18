@@ -23,6 +23,10 @@ class NoCacheHTTPRequestHandler(SimpleHTTPRequestHandler):
         self.send_header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
         self.send_header('Pragma', 'no-cache')
         self.send_header('Expires', '0')
+        # セキュリティ強化ヘッダー
+        self.send_header('X-Content-Type-Options', 'nosniff')
+        self.send_header('X-Frame-Options', 'DENY')
+        self.send_header('Referrer-Policy', 'no-referrer')
         super().end_headers()
 
     def log_message(self, format, *args):
