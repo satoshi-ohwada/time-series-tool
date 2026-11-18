@@ -109,6 +109,43 @@
             <select id="valueColSelect" class="form-control"></select>
           </div>
 
+          <!-- Date / Period Range Filtering Accordion -->
+          <div id="dateRangeSection" class="date-range-section">
+            <div id="dateRangeToggleHeader" class="date-range-header" role="button" tabindex="0" title="クリックして対象期間の絞り込み設定を開閉">
+              <div class="date-range-header-left">
+                <span class="range-icon">📅</span>
+                <span class="range-title-text">対象期間:</span>
+                <span id="dateRangeSummaryBadge" class="date-range-summary-badge">全期間</span>
+              </div>
+              <span id="dateRangeArrow" class="accordion-arrow">▾</span>
+            </div>
+
+            <div id="dateRangeBody" class="date-range-body hidden">
+              <div class="date-range-inputs">
+                <div class="range-input-item">
+                  <label for="startDateSelect" class="sub-label">始点 (開始)</label>
+                  <select id="startDateSelect" class="form-control form-control-sm"></select>
+                </div>
+                <div class="range-sep">〜</div>
+                <div class="range-input-item">
+                  <label for="endDateSelect" class="sub-label">終点 (終了)</label>
+                  <select id="endDateSelect" class="form-control form-control-sm"></select>
+                </div>
+              </div>
+
+              <!-- Quick Presets -->
+              <div class="range-preset-buttons">
+                <button type="button" id="resetRangeBtn" class="btn btn-xs btn-outline" title="全期間に戻す">全期間</button>
+                <button type="button" id="presetRecent1YBtn" class="btn btn-xs btn-ghost" title="直近1年相当">直近1年</button>
+                <button type="button" id="presetRecent3YBtn" class="btn btn-xs btn-ghost" title="直近3年相当">直近3年</button>
+                <button type="button" id="presetFirstHalfBtn" class="btn btn-xs btn-ghost" title="前半50%">前半</button>
+                <button type="button" id="presetSecondHalfBtn" class="btn btn-xs btn-ghost" title="後半50%">後半</button>
+              </div>
+
+              <div id="rangeCountInfo" class="range-count-info">全 0 点中 0 点を対象</div>
+            </div>
+          </div>
+
           <div class="form-group form-group-compact">
             <label for="customTitleInput">グラフタイトル (任意)</label>
             <input type="text" id="customTitleInput" class="form-control" placeholder="例: 2021-2024年度 売上高トレンド分析">
@@ -217,6 +254,13 @@
                 <select id="graphVarValSelect" class="form-control-select-sm"></select>
                 <button type="button" id="nextGraphVarBtn" class="btn-icon-sm" title="次の変数">▶</button>
               </div>
+
+              <!-- Date Range Filter Active Indicator (Visible when filtering is active) -->
+              <div id="graphDateRangeFilterBadge" class="graph-nav-switcher date-filter-badge hidden">
+                <span class="switcher-label">📅 期間指定:</span>
+                <span id="graphDateRangeFilterText" class="date-filter-text">1980/01 〜 1983/12</span>
+                <button type="button" id="clearGraphDateRangeBtn" class="btn-icon-xs" title="全期間に戻す（解除）">✕</button>
+              </div>
             </div>
 
             <!-- Graph Options: View Mode, Toggles, Styling (Secondary Actions) -->
@@ -318,6 +362,6 @@
   <script src="./lib/plotly.min.js"></script>
   <script src="./lib/xlsx.full.min.js"></script>
 
-  <script type="module" src="./src/main.js?v=33"></script>
+  <script type="module" src="./src/main.js?v=34"></script>
 </body>
 </html>

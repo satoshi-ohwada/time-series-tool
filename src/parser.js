@@ -535,9 +535,11 @@ export function interpolateMissingSeries(timestamps, values, enable = true) {
  * @param {string} valueCol 
  * @param {string|null} [groupCol=null]
  * @param {string|null} [selectedGroup=null]
- * @returns {{ timestamps: string[], values: number[] }}
+ * @param {string|null} [startDate=null]
+ * @param {string|null} [endDate=null]
+ * @returns {{ timestamps: string[], values: number[], totalPointsCount: number }}
  */
-export function extractTimeSeries(rows, timeCol, valueCol, groupCol = null, selectedGroup = null) {
+export function extractTimeSeries(rows, timeCol, valueCol, groupCol = null, selectedGroup = null, startDate = null, endDate = null) {
   const points = [];
 
   rows.forEach(row => {
@@ -630,8 +632,57 @@ export function extractTimeSeries(rows, timeCol, valueCol, groupCol = null, sele
     });
   }
 
-  const timestamps = points.map(p => p.timestamp);
-  const values = points.map(p => p.value);
+  const totalPointsCount = points.length;
 
-  return { timestamps, values };
+  // Filter by date range (startDate, endDate) if specified
+  let filteredPoints = points;
+  if (startDate || endDate) {
+    let startIdx = 0;
+    let endIdx = points.length - 1;
+
+    if (startDate) {
+      const idx = points.findIndex(p => p.timestamp === startDate);
+      if (idx !== -1) {
+        startIdx = idx;
+      } else {
+        const sTime = Date.parse(startDate);
+        if (!isNaN(sTime)) {
+          const found = points.findIndex(p => (p._time !== null ? p._time >= sTime : p.timestamp >= startDate));
+          if (found !== -1) startIdx = found;
+        }
+      }
+    }
+
+    if (endDate) {
+      let idx = -1;
+      for (let i = points.length - 1; i >= 0; i--) {
+        if (points[i].timestamp === endDate) {
+          idx = i;
+          break;
+        }
+      }
+      if (idx !== -1) {
+        endIdx = idx;
+      } else {
+        const eTime = Date.parse(endDate);
+        if (!isNaN(eTime)) {
+          for (let i = points.length - 1; i >= 0; i--) {
+            if (points[i]._time !== null ? points[i]._time <= eTime : points[i].timestamp <= endDate) {
+              endIdx = i;
+              break;
+            }
+          }
+        }
+      }
+    }
+
+    if (startIdx <= endIdx) {
+      filteredPoints = points.slice(startIdx, endIdx + 1);
+    }
+  }
+
+  const timestamps = filteredPoints.map(p => p.timestamp);
+  const values = filteredPoints.map(p => p.value);
+
+  return { timestamps, values, totalPointsCount };
 }

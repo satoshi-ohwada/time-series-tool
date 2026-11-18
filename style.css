@@ -1185,4 +1185,158 @@ body {
   }
 }
 
+/* Date / Period Range Filter Accordion */
+.date-range-section {
+  background: rgba(15, 23, 42, 0.45);
+  border: 1px solid rgba(56, 189, 248, 0.25);
+  border-radius: var(--radius-md);
+  padding: 0.45rem 0.55rem;
+  margin-bottom: 0.55rem;
+  transition: all 0.25s ease;
+}
+
+.date-range-section:hover {
+  border-color: rgba(56, 189, 248, 0.45);
+}
+
+.date-range-section.active {
+  border-color: rgba(245, 158, 11, 0.5);
+  background: rgba(245, 158, 11, 0.06);
+}
+
+.date-range-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  user-select: none;
+}
+
+.date-range-header-left {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--text-main);
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.date-range-header-left .range-icon {
+  font-size: 0.9rem;
+}
+
+.date-range-summary-badge {
+  font-size: 0.72rem;
+  padding: 0.12rem 0.45rem;
+  border-radius: 10px;
+  background: rgba(148, 163, 184, 0.15);
+  color: var(--text-sub);
+  white-space: nowrap;
+  transition: all 0.2s ease;
+}
+
+.date-range-section.active .date-range-summary-badge {
+  background: rgba(245, 158, 11, 0.2);
+  color: #fde68a;
+  border: 1px solid rgba(245, 158, 11, 0.4);
+  font-weight: 600;
+}
+
+.accordion-arrow {
+  font-size: 0.85rem;
+  color: var(--text-sub);
+  transition: transform 0.2s ease;
+}
+
+.date-range-section.open .accordion-arrow {
+  transform: rotate(180deg);
+}
+
+.date-range-body {
+  padding-top: 0.5rem;
+  margin-top: 0.35rem;
+  border-top: 1px dashed rgba(255, 255, 255, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.date-range-inputs {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.35rem;
+}
+
+.range-input-item {
+  flex: 1;
+  min-width: 0;
+}
+
+.range-input-item .sub-label {
+  display: block;
+  font-size: 0.72rem;
+  color: var(--text-sub);
+  margin-bottom: 0.2rem;
+}
+
+.range-sep {
+  font-size: 0.75rem;
+  color: var(--text-sub);
+  padding-bottom: 0.35rem;
+  flex-shrink: 0;
+}
+
+.range-preset-buttons {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  flex-wrap: wrap;
+}
+
+.range-preset-buttons button {
+  font-size: 0.68rem;
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+}
+
+.range-count-info {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  text-align: right;
+  line-height: 1.2;
+}
+
+/* Date Range Active Badge in Graph Header Bar */
+.date-filter-badge {
+  background: rgba(245, 158, 11, 0.15);
+  border-color: rgba(245, 158, 11, 0.45);
+}
+
+.date-filter-text {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #fde68a;
+  white-space: nowrap;
+}
+
+.btn-icon-xs {
+  background: transparent;
+  border: none;
+  color: #fde68a;
+  font-size: 0.75rem;
+  cursor: pointer;
+  padding: 0.1rem 0.25rem;
+  border-radius: 4px;
+  line-height: 1;
+  transition: all 0.2s ease;
+}
+
+.btn-icon-xs:hover {
+  background: rgba(245, 158, 11, 0.3);
+  color: #fff;
+}
+
+
 

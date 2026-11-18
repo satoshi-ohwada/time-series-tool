@@ -12,14 +12,14 @@ import {
   checkDuplicateTimestamps,
   detectGroupColumns,
   getUniqueGroupValues
-} from './parser.js?v=33';
-import { stlDecompose } from './stl.js?v=33';
-import { detectTrendChangePoints } from './changePoint.js?v=33';
-import { calculateResidualCusum } from './cusum.js?v=33';
-import { renderChart, downloadChartImage } from './chart.js?v=33';
-import { exportSingleVariableCSV, exportAllVariablesCSV } from './exporter.js?v=33';
-import { renderTableEditor } from './tableEditor.js?v=33';
-import { renderResultTable } from './resultTable.js?v=33';
+} from './parser.js?v=34';
+import { stlDecompose } from './stl.js?v=34';
+import { detectTrendChangePoints } from './changePoint.js?v=34';
+import { calculateResidualCusum } from './cusum.js?v=34';
+import { renderChart, downloadChartImage } from './chart.js?v=34';
+import { exportSingleVariableCSV, exportAllVariablesCSV } from './exporter.js?v=34';
+import { renderTableEditor } from './tableEditor.js?v=34';
+import { renderResultTable } from './resultTable.js?v=34';
 
 const state = {
   rawRows: [],
@@ -31,6 +31,11 @@ const state = {
   groupCol: '',
   selectedGroup: '',
   availableGroups: [], // Array<{ value: string, count: number }>
+  // Date / Period Range Filtering
+  allTimestamps: [],
+  startDate: '',
+  endDate: '',
+  isDateRangeExpanded: false,
   period: 12,
   model: 'auto', // 'auto' | 'additive' | 'multiplicative'
   seasonalMode: 'periodic', // 'periodic' | 'flexible'
@@ -82,6 +87,11 @@ const graphVarValSelect = document.getElementById('graphVarValSelect');
 const prevGraphVarBtn = document.getElementById('prevGraphVarBtn');
 const nextGraphVarBtn = document.getElementById('nextGraphVarBtn');
 
+// Date / Period Range Filter on Graph Header
+const graphDateRangeFilterBadge = document.getElementById('graphDateRangeFilterBadge');
+const graphDateRangeFilterText = document.getElementById('graphDateRangeFilterText');
+const clearGraphDateRangeBtn = document.getElementById('clearGraphDateRangeBtn');
+
 const showGraphModeBtn = document.getElementById('showGraphModeBtn');
 const showResultModeBtn = document.getElementById('showResultModeBtn');
 const showTableModeBtn = document.getElementById('showTableModeBtn');
@@ -94,6 +104,22 @@ const configCard = document.getElementById('configCard');
 const customTitleInput = document.getElementById('customTitleInput');
 const timeColSelect = document.getElementById('timeColSelect');
 const valueColSelect = document.getElementById('valueColSelect');
+
+// Date Range Filter Controls (Sidebar Accordion)
+const dateRangeSection = document.getElementById('dateRangeSection');
+const dateRangeToggleHeader = document.getElementById('dateRangeToggleHeader');
+const dateRangeSummaryBadge = document.getElementById('dateRangeSummaryBadge');
+const dateRangeArrow = document.getElementById('dateRangeArrow');
+const dateRangeBody = document.getElementById('dateRangeBody');
+const startDateSelect = document.getElementById('startDateSelect');
+const endDateSelect = document.getElementById('endDateSelect');
+const resetRangeBtn = document.getElementById('resetRangeBtn');
+const presetRecent1YBtn = document.getElementById('presetRecent1YBtn');
+const presetRecent3YBtn = document.getElementById('presetRecent3YBtn');
+const presetFirstHalfBtn = document.getElementById('presetFirstHalfBtn');
+const presetSecondHalfBtn = document.getElementById('presetSecondHalfBtn');
+const rangeCountInfo = document.getElementById('rangeCountInfo');
+
 const periodInput = document.getElementById('periodInput');
 const periodPresetSelect = document.getElementById('periodPresetSelect');
 const autoDetectPeriodBtn = document.getElementById('autoDetectPeriodBtn');
@@ -306,7 +332,9 @@ function initEventListeners() {
       state.timeCol,
       state.selectedVar,
       state.groupCol,
-      state.selectedGroup
+      state.selectedGroup,
+      state.startDate,
+      state.endDate
     );
     const autoPeriod = detectPeriodicity(values, timestamps);
     state.period = Math.max(2, autoPeriod);
@@ -314,6 +342,49 @@ function initEventListeners() {
     periodDetectBadge.textContent = `✨ 自動判定結果: 推奨周期 = ${state.period}`;
     runDecompositionForAllVars();
   });
+
+  // Date / Period Range Filtering Accordion & Selectors
+  if (dateRangeToggleHeader) {
+    dateRangeToggleHeader.addEventListener('click', toggleDateRangeAccordion);
+    dateRangeToggleHeader.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        toggleDateRangeAccordion();
+      }
+    });
+  }
+
+  if (startDateSelect) {
+    startDateSelect.addEventListener('change', (e) => {
+      onDateRangeSelectChange(e.target.value, state.endDate);
+    });
+  }
+
+  if (endDateSelect) {
+    endDateSelect.addEventListener('change', (e) => {
+      onDateRangeSelectChange(state.startDate, e.target.value);
+    });
+  }
+
+  if (resetRangeBtn) {
+    resetRangeBtn.addEventListener('click', () => setDateRange('', ''));
+  }
+  if (clearGraphDateRangeBtn) {
+    clearGraphDateRangeBtn.addEventListener('click', () => setDateRange('', ''));
+  }
+
+  if (presetRecent1YBtn) {
+    presetRecent1YBtn.addEventListener('click', () => applyRecentPreset(1));
+  }
+  if (presetRecent3YBtn) {
+    presetRecent3YBtn.addEventListener('click', () => applyRecentPreset(3));
+  }
+  if (presetFirstHalfBtn) {
+    presetFirstHalfBtn.addEventListener('click', () => applyFractionPreset(0, 0.5));
+  }
+  if (presetSecondHalfBtn) {
+    presetSecondHalfBtn.addEventListener('click', () => applyFractionPreset(0.5, 1.0));
+  }
 
   autoInterpolateCheck.addEventListener('change', (e) => {
     state.enableInterpolation = e.target.checked;
@@ -525,6 +596,7 @@ function setObservationGroup(groupVal) {
   if (prevGraphGroupBtn) prevGraphGroupBtn.disabled = isFirst;
   if (nextGraphGroupBtn) nextGraphGroupBtn.disabled = isLast;
 
+  updateDateRangeControls();
   runDecompositionForAllVars();
 }
 
@@ -568,6 +640,197 @@ function navigateTargetVariable(delta) {
   const newIdx = currentIdx + delta;
   if (newIdx >= 0 && newIdx < state.valueCols.length) {
     setTargetVariable(state.valueCols[newIdx]);
+  }
+}
+
+// ---------------------------------------------------------------------
+// Date / Period Range Filtering Logic
+// ---------------------------------------------------------------------
+
+function toggleDateRangeAccordion() {
+  state.isDateRangeExpanded = !state.isDateRangeExpanded;
+  if (state.isDateRangeExpanded) {
+    dateRangeSection.classList.add('open');
+    dateRangeBody.classList.remove('hidden');
+  } else {
+    dateRangeSection.classList.remove('open');
+    dateRangeBody.classList.add('hidden');
+  }
+}
+
+function refreshAvailableTimestamps() {
+  if (!state.rawRows.length || !state.timeCol) {
+    state.allTimestamps = [];
+    return;
+  }
+  const targetVar = state.selectedVar || state.valueCols[0] || Object.keys(state.rawRows[0] || {})[1];
+  const { timestamps } = extractTimeSeries(
+    state.rawRows,
+    state.timeCol,
+    targetVar,
+    state.groupCol,
+    state.selectedGroup,
+    null,
+    null
+  );
+  state.allTimestamps = timestamps;
+}
+
+function updateDateRangeControls() {
+  if (!startDateSelect || !endDateSelect || !dateRangeSummaryBadge) return;
+
+  refreshAvailableTimestamps();
+  const times = state.allTimestamps;
+
+  startDateSelect.innerHTML = '';
+  endDateSelect.innerHTML = '';
+
+  if (times.length === 0) {
+    dateRangeSummaryBadge.textContent = 'データなし';
+    dateRangeSection.classList.remove('active');
+    if (graphDateRangeFilterBadge) graphDateRangeFilterBadge.classList.add('hidden');
+    if (rangeCountInfo) rangeCountInfo.textContent = '全 0 点中 0 点を対象';
+    return;
+  }
+
+  // Populate Start Select & End Select
+  times.forEach(t => {
+    const optStart = document.createElement('option');
+    optStart.value = t;
+    optStart.textContent = t;
+    startDateSelect.appendChild(optStart);
+
+    const optEnd = document.createElement('option');
+    optEnd.value = t;
+    optEnd.textContent = t;
+    endDateSelect.appendChild(optEnd);
+  });
+
+  // Clamp current startDate and endDate to existing timestamps
+  if (state.startDate && !times.includes(state.startDate)) {
+    state.startDate = times[0];
+  }
+  if (state.endDate && !times.includes(state.endDate)) {
+    state.endDate = times[times.length - 1];
+  }
+
+  const effectiveStart = state.startDate || times[0];
+  const effectiveEnd = state.endDate || times[times.length - 1];
+
+  startDateSelect.value = effectiveStart;
+  endDateSelect.value = effectiveEnd;
+
+  // Determine if active filter
+  const isFullRange = (!state.startDate || state.startDate === times[0]) &&
+                      (!state.endDate || state.endDate === times[times.length - 1]);
+
+  if (isFullRange) {
+    state.startDate = '';
+    state.endDate = '';
+    dateRangeSection.classList.remove('active');
+    dateRangeSummaryBadge.textContent = `全期間 (${times[0]} 〜 ${times[times.length - 1]})`;
+    if (graphDateRangeFilterBadge) graphDateRangeFilterBadge.classList.add('hidden');
+    if (rangeCountInfo) rangeCountInfo.textContent = `全 ${times.length} 点中 ${times.length} 点を対象 (100%)`;
+  } else {
+    dateRangeSection.classList.add('active');
+    dateRangeSummaryBadge.textContent = `${effectiveStart} 〜 ${effectiveEnd}`;
+    if (graphDateRangeFilterBadge) {
+      graphDateRangeFilterBadge.classList.remove('hidden');
+      if (graphDateRangeFilterText) {
+        graphDateRangeFilterText.textContent = `${effectiveStart} 〜 ${effectiveEnd}`;
+      }
+    }
+    const sIdx = times.indexOf(effectiveStart);
+    const eIdx = times.indexOf(effectiveEnd);
+    const count = (sIdx !== -1 && eIdx !== -1 && eIdx >= sIdx) ? (eIdx - sIdx + 1) : times.length;
+    const pct = Math.round((count / times.length) * 100);
+    if (rangeCountInfo) rangeCountInfo.textContent = `全 ${times.length} 点中 ${count} 点を対象 (${pct}%)`;
+  }
+}
+
+function onDateRangeSelectChange(startVal, endVal) {
+  const times = state.allTimestamps;
+  if (!times.length) return;
+
+  let s = startVal || times[0];
+  let e = endVal || times[times.length - 1];
+
+  let sIdx = times.indexOf(s);
+  let eIdx = times.indexOf(e);
+  if (sIdx === -1) sIdx = 0;
+  if (eIdx === -1) eIdx = times.length - 1;
+
+  if (sIdx > eIdx) {
+    if (startVal !== state.startDate) {
+      eIdx = sIdx;
+      e = times[eIdx];
+    } else {
+      sIdx = eIdx;
+      s = times[sIdx];
+    }
+  }
+
+  setDateRange(s, e);
+}
+
+function setDateRange(start, end) {
+  const times = state.allTimestamps;
+  if (times.length > 0) {
+    if ((!start || start === times[0]) && (!end || end === times[times.length - 1])) {
+      state.startDate = '';
+      state.endDate = '';
+    } else {
+      state.startDate = start;
+      state.endDate = end;
+    }
+  } else {
+    state.startDate = '';
+    state.endDate = '';
+  }
+
+  updateDateRangeControls();
+  runDecompositionForAllVars();
+}
+
+function applyRecentPreset(years) {
+  const times = state.allTimestamps;
+  if (times.length === 0) return;
+
+  const lastT = times[times.length - 1];
+  let targetIdx = -1;
+
+  // Try Date parsing to step back specified years
+  const lastDateParsed = Date.parse(lastT);
+  if (!isNaN(lastDateParsed)) {
+    const targetDate = new Date(lastDateParsed);
+    targetDate.setFullYear(targetDate.getFullYear() - years);
+    const targetMs = targetDate.getTime();
+    targetIdx = times.findIndex(t => {
+      const ms = Date.parse(t);
+      return !isNaN(ms) && ms >= targetMs;
+    });
+  }
+
+  // Fallback heuristic based on seasonal period
+  if (targetIdx === -1) {
+    const pointsCount = Math.max(2, (state.period || 12) * years);
+    targetIdx = Math.max(0, times.length - pointsCount);
+  }
+
+  if (targetIdx >= 0 && targetIdx < times.length) {
+    setDateRange(times[targetIdx], lastT);
+  }
+}
+
+function applyFractionPreset(startFraction, endFraction) {
+  const times = state.allTimestamps;
+  if (times.length === 0) return;
+
+  const sIdx = Math.min(times.length - 1, Math.max(0, Math.floor(times.length * startFraction)));
+  const eIdx = Math.min(times.length - 1, Math.max(0, Math.floor(times.length * endFraction) - 1));
+
+  if (sIdx <= eIdx) {
+    setDateRange(times[sIdx], times[eIdx]);
   }
 }
 
@@ -698,6 +961,11 @@ function processParsedRows(rows) {
 
   // Populate Select Controls
   populateSelects();
+
+  // Reset and update date range filtering
+  state.startDate = '';
+  state.endDate = '';
+  updateDateRangeControls();
 
   // Enable Controls
   configCard.classList.remove('disabled');
@@ -835,7 +1103,9 @@ export function runDecompositionForVar(varName) {
     state.timeCol,
     varName,
     state.groupCol,
-    state.selectedGroup
+    state.selectedGroup,
+    state.startDate,
+    state.endDate
   );
   const { timestamps: interpT, values: interpV, interpolatedCount } = interpolateMissingSeries(rawT, rawV, state.enableInterpolation);
 
